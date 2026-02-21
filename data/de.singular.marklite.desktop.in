@@ -1,0 +1,10 @@
+ [Desktop Entry]
+Type=Application
+Name=MarkLite
+Comment=A lightweight Markdown reader and editor
+Exec=@BIN@
+Icon=de.singular.marklite
+Terminal=false
+Categories=Development;TextEditor;
+Keywords=markdown;editor;viewer;notes;
+StartupNotify=true

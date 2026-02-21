@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "marklite"
+version = "0.1.0"
+description = "A lightweight GTK4 Markdown reader and editor"
+requires-python = ">=3.10"
+dependencies = [
+    "markdown",
+    "pygments",
+]
+
+[project.scripts]
+marklite = "marklite.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["marklite*"]

@@ -1,0 +1,15 @@
+#!@PYTHON@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+import os
+import sys
+import signal
+
+pkgdatadir = '@pkgdatadir@'
+
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+sys.path.insert(0, pkgdatadir)
+
+from marklite.__main__ import main
+
+sys.exit(main())
