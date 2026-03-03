@@ -14,6 +14,8 @@ DEFAULTS = {
     "editor_font_family": "Monospace",
     "editor_font_size": 14,
     "file_watching": True,
+    "window_width": 1000,
+    "window_height": 700,
 }
 
 CONFIG_DIR = Path.home() / ".config" / "marklite"
@@ -82,3 +84,11 @@ class SettingsManager(GObject.Object):
     @property
     def file_watching(self):
         return self.get("file_watching")
+
+    @property
+    def window_width(self):
+        return self.get("window_width")
+
+    @property
+    def window_height(self):
+        return self.get("window_height")

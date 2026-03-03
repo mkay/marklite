@@ -132,6 +132,9 @@ ul, ol {{
 }}
 li {{ margin: 0.3em 0; }}
 {pygments_css}
+/* WebKit find-in-page highlight overrides */
+::highlight(search) {{ background-color: #ffdd00 !important; color: #000 !important; }}
+::highlight(current) {{ background-color: #ff6a00 !important; color: #fff !important; }}
 </style>
 </head>
 <body>
@@ -146,7 +149,11 @@ document.addEventListener("DOMContentLoaded", function() {{
         btn.innerHTML = svgIcon;
         btn.addEventListener("click", function() {{
             var code = pre.querySelector("code");
-            var text = (code || pre).textContent;
+            var raw = (code || pre).textContent;
+            var text = raw.split("\\n").filter(function(line) {{
+                var t = line.trim();
+                return t !== "" && !t.startsWith("#");
+            }}).join("\\n");
             window.webkit.messageHandlers.copyCode.postMessage(text);
             btn.innerHTML = "Copied!";
             btn.classList.add("copied");

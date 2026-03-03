@@ -1,6 +1,6 @@
 # Maintainer: Your Name <your@email.com>
 pkgname=marklite
-pkgver=0.1.0
+pkgver=0.1.4
 pkgrel=1
 pkgdesc="A lightweight GTK4 Markdown reader and editor for GNOME"
 arch=('any')

@@ -29,7 +29,83 @@ class MarkdownViewer(Gtk.Box):
         ws.set_enable_developer_extras(False)
 
         self.append(self._webview)
+        self._build_search_bar()
         self._show_empty()
+
+    def _build_search_bar(self):
+        self._find_controller = self._webview.get_find_controller()
+
+        box = Gtk.Box(spacing=4)
+        box.add_css_class("toolbar")
+        box.set_margin_start(6)
+        box.set_margin_end(6)
+        box.set_margin_top(4)
+        box.set_margin_bottom(4)
+
+        self._search_entry = Gtk.SearchEntry(hexpand=True, placeholder_text="Find in document")
+        self._search_entry.connect("search-changed", self._on_search_changed)
+        self._search_entry.connect("activate", lambda *_: self._find_controller.search_next())
+        box.append(self._search_entry)
+
+        prev_btn = Gtk.Button(icon_name="marklite-go-up-symbolic", tooltip_text="Previous match")
+        prev_btn.connect("clicked", lambda *_: self._find_controller.search_previous())
+        box.append(prev_btn)
+
+        next_btn = Gtk.Button(icon_name="marklite-go-down-symbolic", tooltip_text="Next match")
+        next_btn.connect("clicked", lambda *_: self._find_controller.search_next())
+        box.append(next_btn)
+
+        close_btn = Gtk.Button(icon_name="marklite-close-symbolic", tooltip_text="Close")
+        close_btn.connect("clicked", lambda *_: self.hide_search())
+        box.append(close_btn)
+
+        self._search_bar = box
+        self._search_bar.set_visible(False)
+        self.prepend(self._search_bar)
+
+        key_ctl = Gtk.EventControllerKey()
+        key_ctl.connect("key-pressed", self._on_search_key)
+        self._search_entry.add_controller(key_ctl)
+
+    def _on_search_changed(self, entry):
+        text = entry.get_text()
+        if text:
+            self._find_controller.search(
+                text,
+                WebKit.FindOptions.CASE_INSENSITIVE | WebKit.FindOptions.WRAP_AROUND,
+                0,
+            )
+        else:
+            self._find_controller.search_finish()
+
+    def _inject_find_css(self):
+        css = (
+            "::highlight(search) { background: #ffdd00 !important; color: #000 !important; }"
+            "::highlight(current) { background: #ff6a00 !important; color: #000 !important; }"
+        )
+        script = (
+            f"(function(){{ var s = document.createElement('style');"
+            f"s.textContent = '{css}'; document.head.appendChild(s); }})()"
+        )
+        self._webview.evaluate_javascript(script, -1, None, None, None, None)
+
+    def _on_search_key(self, _ctl, keyval, _keycode, _state):
+        if keyval == Gdk.KEY_Escape:
+            self.hide_search()
+            return True
+        return False
+
+    def toggle_search(self):
+        if self._search_bar.get_visible():
+            self.hide_search()
+        else:
+            self._search_bar.set_visible(True)
+            self._search_entry.grab_focus()
+
+    def hide_search(self):
+        self._search_bar.set_visible(False)
+        self._find_controller.search_finish()
+        self._search_entry.set_text("")
 
     def _on_copy_code(self, _ucm, result):
         text = result.to_string()

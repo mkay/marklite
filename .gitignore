@@ -3,3 +3,4 @@ pkg/
 src/
 *.pkg.tar.zst
 __pycache__/
+marklite/__init__.py

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/de/singular/marklite/icons/hicolor/scalable/actions">
+<file alias="marklite-open-menu-symbolic.svg">icons/hicolor/scalable/actions/marklite-open-menu-symbolic.svg</file>
+    <file alias="marklite-edit-symbolic.svg">icons/hicolor/scalable/actions/marklite-edit-symbolic.svg</file>
+    <file alias="marklite-document-new-symbolic.svg">icons/hicolor/scalable/actions/marklite-document-new-symbolic.svg</file>
+    <file alias="marklite-folder-symbolic.svg">icons/hicolor/scalable/actions/marklite-folder-symbolic.svg</file>
+    <file alias="marklite-folder-new-symbolic.svg">icons/hicolor/scalable/actions/marklite-folder-new-symbolic.svg</file>
+    <file alias="marklite-file-markdown-symbolic.svg">icons/hicolor/scalable/actions/marklite-file-markdown-symbolic.svg</file>
+    <file alias="marklite-go-up-symbolic.svg">icons/hicolor/scalable/actions/marklite-go-up-symbolic.svg</file>
+    <file alias="marklite-go-down-symbolic.svg">icons/hicolor/scalable/actions/marklite-go-down-symbolic.svg</file>
+    <file alias="marklite-close-symbolic.svg">icons/hicolor/scalable/actions/marklite-close-symbolic.svg</file>
+    <file alias="marklite-document-all-symbolic.svg">icons/hicolor/scalable/actions/marklite-document-all-symbolic.svg</file>
+    <file alias="marklite-sidebar-show-symbolic.svg">icons/hicolor/scalable/actions/marklite-sidebar-show-symbolic.svg</file>
+    <file alias="marklite-sidebar-hide-symbolic.svg">icons/hicolor/scalable/actions/marklite-sidebar-hide-symbolic.svg</file>
+  </gresource>
+  <gresource prefix="/de/singular/marklite/icons/hicolor/scalable/apps">
+    <file alias="de.singular.marklite.svg">icons/hicolor/scalable/apps/de.singular.marklite.svg</file>
+  </gresource>
+</gresources>

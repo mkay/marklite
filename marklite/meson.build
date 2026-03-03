@@ -1,7 +1,15 @@
+configure_file(
+  input: '__init__.py.in',
+  output: '__init__.py',
+  configuration: conf,
+  install: true,
+  install_dir: moduledir,
+)
+
 marklite_sources = [
-  '__init__.py',
   '__main__.py',
   'app.py',
+  'document_panel.py',
   'editor.py',
   'file_watcher.py',
   'html_template.py',
@@ -10,7 +18,23 @@ marklite_sources = [
   'settings_manager.py',
   'sidebar.py',
   'viewer.py',
+  'welcome.py',
   'window.py',
 ]
 
 install_data(marklite_sources, install_dir: moduledir)
+
+# App-specific icons — kept inside the package data dir
+install_subdir(
+  'data' / 'icons',
+  install_dir: moduledir / 'data',
+)
+
+gnome.compile_resources(
+  'de.singular.marklite',
+  'data/de.singular.marklite.gresource.xml',
+  source_dir: 'data',
+  gresource_bundle: true,
+  install: true,
+  install_dir: moduledir / 'data',
+)

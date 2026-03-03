@@ -40,6 +40,7 @@ class MarkdownEditor(Gtk.Box):
 
         scrolled.set_child(self._view)
         self.append(scrolled)
+        self._build_search_bar()
 
     def _setup_shortcuts(self):
         ctrl = Gtk.EventControllerKey()
@@ -158,6 +159,88 @@ class MarkdownEditor(Gtk.Box):
             provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
         self._css_provider = provider
+
+    def _build_search_bar(self):
+        self._search_settings = GtkSource.SearchSettings()
+        self._search_settings.set_case_sensitive(False)
+        self._search_settings.set_wrap_around(True)
+        self._search_context = GtkSource.SearchContext(
+            buffer=self._buffer, settings=self._search_settings,
+        )
+        self._search_context.set_highlight(True)
+
+        box = Gtk.Box(spacing=4)
+        box.add_css_class("toolbar")
+        box.set_margin_start(6)
+        box.set_margin_end(6)
+        box.set_margin_top(4)
+        box.set_margin_bottom(4)
+
+        self._search_entry = Gtk.SearchEntry(hexpand=True, placeholder_text="Find in editor")
+        self._search_entry.connect("search-changed", self._on_search_changed)
+        self._search_entry.connect("activate", lambda *_: self._search_next())
+        box.append(self._search_entry)
+
+        prev_btn = Gtk.Button(icon_name="go-up-symbolic", tooltip_text="Previous match")
+        prev_btn.connect("clicked", lambda *_: self._search_prev())
+        box.append(prev_btn)
+
+        next_btn = Gtk.Button(icon_name="go-down-symbolic", tooltip_text="Next match")
+        next_btn.connect("clicked", lambda *_: self._search_next())
+        box.append(next_btn)
+
+        close_btn = Gtk.Button(icon_name="window-close-symbolic", tooltip_text="Close")
+        close_btn.connect("clicked", lambda *_: self.hide_search())
+        box.append(close_btn)
+
+        self._search_box = box
+        self._search_box.set_visible(False)
+        self.prepend(self._search_box)
+
+        key_ctl = Gtk.EventControllerKey()
+        key_ctl.connect("key-pressed", self._on_search_key)
+        self._search_entry.add_controller(key_ctl)
+
+    def _on_search_changed(self, entry):
+        self._search_settings.set_search_text(entry.get_text() or None)
+
+    def _on_search_key(self, _ctl, keyval, _keycode, _state):
+        if keyval == Gdk.KEY_Escape:
+            self.hide_search()
+            return True
+        return False
+
+    def _search_next(self):
+        cursor = self._buffer.get_iter_at_mark(self._buffer.get_insert())
+        found, start, end, _ = self._search_context.forward(cursor)
+        if found:
+            # Avoid getting stuck on current match
+            if start.equal(self._buffer.get_iter_at_mark(self._buffer.get_insert())):
+                cursor.forward_char()
+                found, start, end, _ = self._search_context.forward(cursor)
+            if found:
+                self._buffer.select_range(start, end)
+                self._view.scroll_to_iter(start, 0.2, False, 0, 0)
+
+    def _search_prev(self):
+        cursor = self._buffer.get_iter_at_mark(self._buffer.get_insert())
+        found, start, end, _ = self._search_context.backward(cursor)
+        if found:
+            self._buffer.select_range(start, end)
+            self._view.scroll_to_iter(start, 0.2, False, 0, 0)
+
+    def toggle_search(self):
+        if self._search_box.get_visible():
+            self.hide_search()
+        else:
+            self._search_box.set_visible(True)
+            self._search_entry.grab_focus()
+
+    def hide_search(self):
+        self._search_box.set_visible(False)
+        self._search_settings.set_search_text(None)
+        self._search_entry.set_text("")
+        self._view.grab_focus()
 
     def load_text(self, text):
         self._buffer.set_text(text)

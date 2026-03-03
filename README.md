@@ -52,3 +52,7 @@ meson install -C builddir
 ## Configuration
 
 Settings are stored in `~/.config/marklite/settings.json` and can be changed from the Preferences dialog. All changes take effect immediately.
+
+## Disclaimer
+
+This project was created with AI assistance. The code has not been thoroughly reviewed. Verify its correctness and suitability before use. 
