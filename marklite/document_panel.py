@@ -9,6 +9,20 @@ from gi.repository import Adw, Gtk, Gio, GObject, Gdk, Graphene
 from marklite.sidebar import Sidebar
 
 
+def _collect_subdirs(root):
+    """Return sorted list of (path, name) for immediate subdirectories."""
+    dirs = []
+    try:
+        for entry in sorted(os.scandir(root), key=lambda e: e.name.lower()):
+            if entry.name.startswith("."):
+                continue
+            if entry.is_dir(follow_symlinks=False):
+                dirs.append((entry.path, entry.name))
+    except OSError:
+        pass
+    return dirs
+
+
 def _collect_md_files(dir_path):
     """Return sorted list of .md file paths in a directory (non-recursive)."""
     files = []
@@ -109,7 +123,7 @@ class DocumentPanel(Gtk.Box):
         self._context_path = None
 
         # Main scrolled area
-        scrolled = Gtk.ScrolledWindow(vexpand=True)
+        self._scrolled = Gtk.ScrolledWindow(vexpand=True)
 
         self._clamp = Adw.Clamp(
             maximum_size=640,
@@ -125,17 +139,18 @@ class DocumentPanel(Gtk.Box):
         )
 
         self._clamp.set_child(self._content_box)
-        scrolled.set_child(self._clamp)
+        self._scrolled.set_child(self._clamp)
 
         # Empty state
         self._empty = Adw.StatusPage(
             title="No Documents",
             description="This folder has no markdown files.",
-            icon_name="marklite-file-markdown-symbolic",
+            icon_name="marklite-search-symbolic",
+            vexpand=True,
         )
         self._empty.set_visible(False)
 
-        self.append(scrolled)
+        self.append(self._scrolled)
         self.append(self._empty)
 
         self._setup_context_menu()
@@ -157,15 +172,28 @@ class DocumentPanel(Gtk.Box):
             self._content_box.remove(child)
             child = next_child
 
+    def _partition_pinned(self, files):
+        """Split files into (pinned, unpinned) preserving order within each."""
+        pinned, unpinned = [], []
+        for f in files:
+            if self._settings.is_pinned(f):
+                pinned.append(f)
+            else:
+                unpinned.append(f)
+        return pinned, unpinned
+
     def _show_single_folder(self, dir_path):
         files = _collect_md_files(dir_path)
         if not files:
+            self._scrolled.set_visible(False)
             self._empty.set_visible(True)
             return
+        self._scrolled.set_visible(True)
         self._empty.set_visible(False)
 
+        pinned, unpinned = self._partition_pinned(files)
         listbox = self._make_listbox()
-        for path in files:
+        for path in pinned + unpinned:
             listbox.append(self._make_document_row(path))
         self._content_box.append(listbox)
 
@@ -174,14 +202,16 @@ class DocumentPanel(Gtk.Box):
         groups = _collect_md_files_recursive(root)
 
         if not groups:
+            self._scrolled.set_visible(False)
             self._empty.set_visible(True)
             return
+        self._scrolled.set_visible(True)
         self._empty.set_visible(False)
 
         for dir_path, files in groups.items():
             # Section header
             if dir_path == root:
-                section_name = "Root"
+                section_name = "No Folder"
             else:
                 section_name = os.path.relpath(dir_path, root)
 
@@ -195,8 +225,9 @@ class DocumentPanel(Gtk.Box):
             )
             self._content_box.append(header)
 
+            pinned, unpinned = self._partition_pinned(files)
             listbox = self._make_listbox()
-            for path in files:
+            for path in pinned + unpinned:
                 listbox.append(self._make_document_row(path))
             self._content_box.append(listbox)
 
@@ -241,7 +272,7 @@ class DocumentPanel(Gtk.Box):
             size_date = ""
 
         if md_title:
-            subtitle_text = f"{stem} \u00b7 {size_date}" if size_date else stem
+            subtitle_text = f"{basename} \u00b7 {size_date}" if size_date else basename
         else:
             subtitle_text = size_date
 
@@ -254,6 +285,12 @@ class DocumentPanel(Gtk.Box):
         info_box.append(title)
         info_box.append(subtitle)
         box.append(info_box)
+
+        if self._settings.is_pinned(path):
+            pin_icon = Gtk.Image.new_from_icon_name("marklite-pin-symbolic")
+            pin_icon.add_css_class("dim-label")
+            pin_icon.set_valign(Gtk.Align.CENTER)
+            box.append(pin_icon)
 
         row = Gtk.ListBoxRow(child=box)
         row._file_path = path
@@ -271,24 +308,46 @@ class DocumentPanel(Gtk.Box):
 
     # ---- Context menu ---------------------------------------------------
 
-    def _setup_context_menu(self):
+    def _build_context_menu(self, path):
+        pin_section = Gio.Menu()
+        label = "Unpin" if self._settings.is_pinned(path) else "Pin"
+        pin_section.append(label, "docpanel.toggle-pin")
+
         section = Gio.Menu()
+        section.append("Open With…", "docpanel.open-with")
         section.append("Rename", "docpanel.rename")
+        section.append("Move to Folder…", "docpanel.move-to-folder")
         section.append("Move to Trash", "docpanel.trash")
         section.append("Reveal in File Manager", "docpanel.reveal")
 
-        menu = Gio.Menu()
-        menu.append_section(None, section)
+        path_section = Gio.Menu()
+        path_section.append("Copy Path", "docpanel.copy-path")
 
-        self._popover = Gtk.PopoverMenu(menu_model=menu)
+        menu = Gio.Menu()
+        menu.append_section(None, pin_section)
+        menu.append_section(None, section)
+        menu.append_section(None, path_section)
+        return menu
+
+    def _setup_context_menu(self):
+        self._popover = Gtk.PopoverMenu()
         self._popover.set_parent(self)
         self._popover.set_has_arrow(False)
+        self._context_rect = Gdk.Rectangle()
 
         group = Gio.SimpleActionGroup()
+
+        open_with_action = Gio.SimpleAction.new("open-with", None)
+        open_with_action.connect("activate", self._on_open_with_activate)
+        group.add_action(open_with_action)
 
         rename_action = Gio.SimpleAction.new("rename", None)
         rename_action.connect("activate", self._on_rename_activate)
         group.add_action(rename_action)
+
+        move_action = Gio.SimpleAction.new("move-to-folder", None)
+        move_action.connect("activate", self._on_move_to_folder_activate)
+        group.add_action(move_action)
 
         trash_action = Gio.SimpleAction.new("trash", None)
         trash_action.connect("activate", self._on_trash_activate)
@@ -298,10 +357,21 @@ class DocumentPanel(Gtk.Box):
         reveal_action.connect("activate", self._on_reveal_activate)
         group.add_action(reveal_action)
 
+        copy_path_action = Gio.SimpleAction.new("copy-path", None)
+        copy_path_action.connect("activate", self._on_copy_path_activate)
+        group.add_action(copy_path_action)
+
+        toggle_pin_action = Gio.SimpleAction.new("toggle-pin", None)
+        toggle_pin_action.connect("activate", self._on_toggle_pin_activate)
+        group.add_action(toggle_pin_action)
+
         self.insert_action_group("docpanel", group)
 
     def _on_row_right_click(self, gesture, _n_press, x, y, row):
         self._context_path = row._file_path
+
+        # Rebuild menu to reflect current pin state
+        self._popover.set_menu_model(self._build_context_menu(row._file_path))
 
         # Compute position relative to self (popover parent)
         src_point = Graphene.Point()
@@ -313,13 +383,85 @@ class DocumentPanel(Gtk.Box):
         else:
             px, py = x, y
 
-        rect = Gdk.Rectangle()
-        rect.x = int(px)
-        rect.y = int(py)
-        rect.width = 1
-        rect.height = 1
-        self._popover.set_pointing_to(rect)
+        self._context_rect.x = int(px)
+        self._context_rect.y = int(py)
+        self._context_rect.width = 1
+        self._context_rect.height = 1
+        self._popover.set_pointing_to(self._context_rect)
         self._popover.popup()
+
+    def _on_toggle_pin_activate(self, *_args):
+        if not self._context_path:
+            return
+        self._settings.toggle_pin(self._context_path)
+        self.refresh()
+
+    def _on_open_with_activate(self, *_args):
+        if not self._context_path:
+            return
+
+        # Gather candidate apps: markdown type first, fall back to plain text
+        apps, seen = [], set()
+        for mime in ("text/markdown", "text/plain"):
+            for app in Gio.AppInfo.get_recommended_for_type(mime):
+                aid = app.get_id()
+                if aid and aid not in seen and "marklite" not in aid:
+                    apps.append(app)
+                    seen.add(aid)
+
+        if not apps:
+            return
+
+        popover = Gtk.Popover()
+        popover.set_parent(self)
+        popover.set_has_arrow(True)
+
+        box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL,
+            spacing=2,
+            margin_start=4,
+            margin_end=4,
+            margin_top=4,
+            margin_bottom=4,
+        )
+
+        for app in apps:
+            btn = Gtk.Button()
+            btn.add_css_class("flat")
+
+            row_box = Gtk.Box(
+                orientation=Gtk.Orientation.HORIZONTAL,
+                spacing=10,
+                margin_start=6,
+                margin_end=6,
+                margin_top=4,
+                margin_bottom=4,
+            )
+            icon = app.get_icon()
+            if icon:
+                img = Gtk.Image.new_from_gicon(icon)
+            else:
+                img = Gtk.Image.new_from_icon_name("application-x-executable-symbolic")
+            img.set_icon_size(Gtk.IconSize.NORMAL)
+            row_box.append(img)
+            row_box.append(Gtk.Label(label=app.get_display_name(), xalign=0))
+            btn.set_child(row_box)
+            btn.connect("clicked", self._launch_with_app, app, popover)
+            box.append(btn)
+
+        popover.set_child(box)
+        popover.set_pointing_to(self._context_rect)
+        popover.popup()
+
+    def _launch_with_app(self, _btn, app, popover):
+        popover.popdown()
+        if not self._context_path:
+            return
+        uri = Gio.File.new_for_path(self._context_path).get_uri()
+        try:
+            app.launch_uris([uri], None)
+        except Exception:
+            pass
 
     def _on_reveal_activate(self, *_args):
         if not self._context_path:
@@ -327,6 +469,11 @@ class DocumentPanel(Gtk.Box):
         gfile = Gio.File.new_for_path(self._context_path)
         launcher = Gtk.FileLauncher.new(gfile)
         launcher.open_containing_folder(self.get_root(), None, None)
+
+    def _on_copy_path_activate(self, *_args):
+        if not self._context_path:
+            return
+        Gdk.Display.get_default().get_clipboard().set(self._context_path)
 
     def _on_trash_activate(self, *_args):
         if not self._context_path:
@@ -353,6 +500,56 @@ class DocumentPanel(Gtk.Box):
         except Exception:
             return
         self.emit("file-trashed", path)
+        self.refresh()
+
+    def _on_move_to_folder_activate(self, *_args):
+        if not self._context_path:
+            return
+        root = self._settings.root_directory
+        subdirs = _collect_subdirs(root)
+        if not subdirs:
+            return  # nowhere to move to
+
+        name = os.path.basename(self._context_path)
+        current_dir = os.path.dirname(self._context_path)
+
+        folder_paths = [root] + [p for p, _ in subdirs]
+        folder_names = ["No Folder"] + [n for _, n in subdirs]
+
+        dialog = Adw.AlertDialog(
+            heading="Move to Folder",
+            body=f"Choose a destination folder for \u201c{name}\u201d:",
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("move", "Move")
+        dialog.set_response_appearance("move", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("move")
+        dialog.set_close_response("cancel")
+
+        dropdown = Gtk.DropDown.new_from_strings(folder_names)
+        dropdown.set_valign(Gtk.Align.CENTER)
+        pre = folder_paths.index(current_dir) if current_dir in folder_paths else 0
+        dropdown.set_selected(pre)
+
+        dialog.set_extra_child(dropdown)
+        dialog.connect("response", self._on_move_to_folder_response,
+                       self._context_path, dropdown, folder_paths)
+        dialog.present(self.get_root())
+
+    def _on_move_to_folder_response(self, _dialog, response, old_path, dropdown, folder_paths):
+        if response != "move":
+            return
+        dest_dir = folder_paths[dropdown.get_selected()]
+        if dest_dir == os.path.dirname(old_path):
+            return
+        new_path = os.path.join(dest_dir, os.path.basename(old_path))
+        if os.path.exists(new_path):
+            return
+        try:
+            os.rename(old_path, new_path)
+        except OSError:
+            return
+        self.emit("file-renamed", old_path, new_path)
         self.refresh()
 
     def _on_rename_activate(self, *_args):

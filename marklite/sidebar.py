@@ -349,24 +349,52 @@ class Sidebar(Gtk.Box):
         entry.select_region(start, end)
 
     def _new_file(self, parent_dir):
-        dialog = Adw.AlertDialog(
-            heading="New File",
-            body="Enter a name for the new markdown file:",
-        )
+        root = self._settings.root_directory
+        subdirs = _collect_subdirs(root)
+
+        # folder_paths[i] maps to the dropdown index
+        folder_paths = [root] + [p for p, _ in subdirs]
+        folder_names = ["No Folder"] + [n for _, n in subdirs]
+
+        dialog = Adw.AlertDialog(heading="New File")
         dialog.add_response("cancel", "Cancel")
         dialog.add_response("create", "Create")
         dialog.set_response_appearance("create", Adw.ResponseAppearance.SUGGESTED)
         dialog.set_default_response("create")
         dialog.set_close_response("cancel")
 
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+
         entry = Gtk.Entry(text="Untitled.md")
         entry.set_activates_default(True)
         entry.connect("map", self._focus_and_select, 0, entry.get_text().rfind("."))
-        dialog.set_extra_child(entry)
-        dialog.connect("response", self._on_new_file_response, parent_dir, entry)
+        vbox.append(entry)
+
+        folder_dropdown = None
+        if subdirs:
+            row = Gtk.Box(
+                orientation=Gtk.Orientation.HORIZONTAL,
+                spacing=8,
+                margin_top=2,
+            )
+            lbl = Gtk.Label(label="Folder", xalign=0, hexpand=True)
+            lbl.add_css_class("dim-label")
+            folder_dropdown = Gtk.DropDown.new_from_strings(folder_names)
+            folder_dropdown.set_valign(Gtk.Align.CENTER)
+            pre = folder_paths.index(parent_dir) if parent_dir in folder_paths else 0
+            folder_dropdown.set_selected(pre)
+            row.append(lbl)
+            row.append(folder_dropdown)
+            vbox.append(row)
+
+        dialog.set_extra_child(vbox)
+        dialog.connect(
+            "response", self._on_new_file_response,
+            entry, folder_dropdown, folder_paths,
+        )
         dialog.present(self.get_root())
 
-    def _on_new_file_response(self, _dialog, response, parent_dir, entry):
+    def _on_new_file_response(self, _dialog, response, entry, folder_dropdown, folder_paths):
         if response != "create":
             return
         name = entry.get_text().strip()
@@ -374,6 +402,11 @@ class Sidebar(Gtk.Box):
             return
         if not name.lower().endswith(".md"):
             name += ".md"
+        parent_dir = (
+            folder_paths[folder_dropdown.get_selected()]
+            if folder_dropdown is not None
+            else folder_paths[0]
+        )
         path = os.path.join(parent_dir, name)
         if os.path.exists(path):
             return

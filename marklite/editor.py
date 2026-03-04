@@ -1,257 +1,183 @@
+import json
+import os
+
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
-gi.require_version("GtkSource", "5")
-from gi.repository import Adw, Gdk, Gtk, GtkSource
+gi.require_version("WebKit", "6.0")
+from gi.repository import Adw, Gdk, GLib, Gtk, WebKit
+
+
+_EDITOR_HTML = os.path.join(
+    os.path.dirname(__file__), "data", "editor", "editor.html"
+)
 
 
 class MarkdownEditor(Gtk.Box):
     def __init__(self, settings):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self._settings = settings
+        self._text_cache = ""
+        self._ready = False
+        self._pending_text = None
+        self._save_callback = None
+        self._preview_callback = None
 
-        scrolled = Gtk.ScrolledWindow()
-        scrolled.set_vexpand(True)
-        scrolled.set_hexpand(True)
+        ucm = WebKit.UserContentManager()
+        ucm.register_script_message_handler("textChanged")
+        ucm.register_script_message_handler("saveRequest")
+        ucm.connect("script-message-received::textChanged", self._on_text_changed)
+        ucm.connect("script-message-received::saveRequest", self._on_save_request)
 
-        self._buffer = GtkSource.Buffer()
-        lang_manager = GtkSource.LanguageManager.get_default()
-        lang = lang_manager.get_language("markdown")
-        if lang:
-            self._buffer.set_language(lang)
-        self._buffer.set_highlight_syntax(True)
+        self._webview = WebKit.WebView(user_content_manager=ucm)
+        self._webview.set_vexpand(True)
+        self._webview.set_hexpand(True)
+        self._webview.connect("load-changed", self._on_load_changed)
 
-        self._view = GtkSource.View(buffer=self._buffer)
-        self._view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
-        self._view.set_show_line_numbers(True)
-        self._view.set_tab_width(4)
-        self._view.set_insert_spaces_instead_of_tabs(True)
-        self._view.set_auto_indent(True)
-        self._view.set_monospace(True)
-        self._view.set_top_margin(8)
-        self._view.set_bottom_margin(8)
-        self._view.set_left_margin(8)
-        self._view.set_right_margin(8)
+        ws = self._webview.get_settings()
+        ws.set_enable_developer_extras(False)
 
-        self._apply_style()
-        self._apply_scheme()
-        self._setup_shortcuts()
+        self.prepend(self._build_toolbar())
+        self.append(self._webview)
 
-        scrolled.set_child(self._view)
-        self.append(scrolled)
-        self._build_search_bar()
+        Adw.StyleManager.get_default().connect("notify::dark", self._on_dark_changed)
 
-    def _setup_shortcuts(self):
-        ctrl = Gtk.EventControllerKey()
-        ctrl.connect("key-pressed", self._on_key_pressed)
-        self._view.add_controller(ctrl)
+        self._webview.load_uri(f"file://{_EDITOR_HTML}")
 
-    def _on_key_pressed(self, controller, keyval, keycode, state):
-        mod = state & Gtk.accelerator_get_default_mod_mask()
-        ctrl = Gdk.ModifierType.CONTROL_MASK
-        ctrl_shift = ctrl | Gdk.ModifierType.SHIFT_MASK
+    # ------------------------------------------------------------------
+    # Toolbar
 
-        if mod == ctrl:
-            if keyval == Gdk.KEY_b:
-                self._wrap_selection("**", "**")
-                return True
-            if keyval == Gdk.KEY_i:
-                self._wrap_selection("*", "*")
-                return True
-            if keyval == Gdk.KEY_k:
-                self._insert_link()
-                return True
-            if keyval == Gdk.KEY_grave:
-                self._wrap_selection("`", "`")
-                return True
-        elif mod == ctrl_shift:
-            if keyval in (Gdk.KEY_x, Gdk.KEY_X):
-                self._wrap_selection("~~", "~~")
-                return True
-            if keyval in (Gdk.KEY_k, Gdk.KEY_K):
-                self._insert_code_block()
-                return True
+    def _build_toolbar(self):
+        bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        bar.add_css_class("toolbar")
 
-        return False
+        def btn(icon=None, label=None, tip=None, js=None):
+            b = Gtk.Button()
+            b.add_css_class("flat")
+            b.set_focus_on_click(False)
+            if icon:
+                b.set_child(Gtk.Image(icon_name=icon))
+            else:
+                lbl = Gtk.Label(label=label)
+                lbl.add_css_class("caption")
+                lbl.add_css_class("monospace")
+                b.set_child(lbl)
+            if tip:
+                b.set_tooltip_text(tip)
+            if js:
+                b.connect("clicked", lambda _b, s=js: self._js(s))
+            return b
 
-    def _wrap_selection(self, prefix, suffix):
-        buf = self._buffer
-        has_sel = buf.get_has_selection()
-        buf.begin_user_action()
-        if has_sel:
-            start, end = buf.get_selection_bounds()
-            text = buf.get_text(start, end, True)
-            buf.delete(start, end)
-            buf.insert(start, prefix + text + suffix)
-            # Reselect the inner text
-            cursor = buf.get_iter_at_mark(buf.get_insert())
-            end_sel = cursor.copy()
-            start_sel = cursor.copy()
-            start_sel.backward_chars(len(suffix) + len(text))
-            end_sel.backward_chars(len(suffix))
-            buf.select_range(start_sel, end_sel)
-        else:
-            buf.insert_at_cursor(prefix + suffix)
-            cursor = buf.get_iter_at_mark(buf.get_insert())
-            cursor.backward_chars(len(suffix))
-            buf.place_cursor(cursor)
-        buf.end_user_action()
+        def sep():
+            s = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
+            s.set_margin_top(6)
+            s.set_margin_bottom(6)
+            s.set_margin_start(4)
+            s.set_margin_end(4)
+            return s
 
-    def _insert_link(self):
-        buf = self._buffer
-        has_sel = buf.get_has_selection()
-        buf.begin_user_action()
-        if has_sel:
-            start, end = buf.get_selection_bounds()
-            text = buf.get_text(start, end, True)
-            buf.delete(start, end)
-            buf.insert(start, "[" + text + "](url)")
-            # Select "url" so user can type the URL
-            cursor = buf.get_iter_at_mark(buf.get_insert())
-            end_sel = cursor.copy()
-            end_sel.backward_chars(1)  # before )
-            start_sel = end_sel.copy()
-            start_sel.backward_chars(3)  # before url
-            buf.select_range(start_sel, end_sel)
-        else:
-            buf.insert_at_cursor("[](url)")
-            cursor = buf.get_iter_at_mark(buf.get_insert())
-            cursor.backward_chars(6)  # inside []
-            buf.place_cursor(cursor)
-        buf.end_user_action()
+        # Headings
+        bar.append(btn(icon="marklite-heading-1-symbolic", tip="Heading 1", js="window.formatHeading(1)"))
+        bar.append(btn(icon="marklite-heading-2-symbolic", tip="Heading 2", js="window.formatHeading(2)"))
+        bar.append(btn(icon="marklite-heading-3-symbolic", tip="Heading 3", js="window.formatHeading(3)"))
+        bar.append(sep())
 
-    def _insert_code_block(self):
-        buf = self._buffer
-        has_sel = buf.get_has_selection()
-        buf.begin_user_action()
-        if has_sel:
-            start, end = buf.get_selection_bounds()
-            text = buf.get_text(start, end, True)
-            buf.delete(start, end)
-            buf.insert(start, "```\n" + text + "\n```")
-        else:
-            buf.insert_at_cursor("```\n\n```")
-            cursor = buf.get_iter_at_mark(buf.get_insert())
-            cursor.backward_chars(4)  # between the newlines
-            buf.place_cursor(cursor)
-        buf.end_user_action()
+        # Inline formatting
+        bar.append(btn(icon="marklite-format-bold-symbolic",          tip="Bold (Ctrl+B)",             js="window.formatBold()"))
+        bar.append(btn(icon="marklite-format-italic-symbolic",        tip="Italic (Ctrl+I)",           js="window.formatItalic()"))
+        bar.append(btn(icon="marklite-format-strikethrough-symbolic", tip="Strikethrough",              js="window.formatStrike()"))
+        bar.append(btn(icon="marklite-format-code-symbolic",          tip="Inline code (Ctrl+`)",      js="window.formatCode()"))
+        bar.append(btn(icon="marklite-format-code-block-symbolic",    tip="Code block (Ctrl+Shift+K)", js="window.formatCodeBlock()"))
+        bar.append(sep())
 
-    def _apply_scheme(self):
-        sm = GtkSource.StyleSchemeManager.get_default()
+        # Block inserts
+        bar.append(btn(icon="marklite-insert-link-symbolic",          tip="Link (Ctrl+K)",             js="window.formatLink()"))
+        bar.append(btn(icon="marklite-format-quote-symbolic",         tip="Blockquote",                js="window.formatQuote()"))
+        bar.append(sep())
+
+        # Lists
+        bar.append(btn(icon="marklite-list-bullet-symbolic",    tip="Bullet list (Ctrl+Shift+U)",   js="window.formatBullet()"))
+        bar.append(btn(icon="marklite-list-ordered-symbolic",   tip="Numbered list (Ctrl+Shift+O)", js="window.formatNumbered()"))
+
+        return bar
+
+    # ------------------------------------------------------------------
+    # Internal
+
+    def _on_load_changed(self, _webview, event):
+        if event != WebKit.LoadEvent.FINISHED:
+            return
+        self._ready = True
+        GLib.idle_add(self._post_load_init)
+
+    def _post_load_init(self):
+        self._apply_style_js()
+        if self._pending_text is not None:
+            self._js_set_content(self._pending_text)
+            self._pending_text = None
+        return GLib.SOURCE_REMOVE
+
+    def _on_text_changed(self, _ucm, result):
+        self._text_cache = result.to_string()
+        if self._preview_callback:
+            self._preview_callback(self._text_cache)
+
+    def _on_save_request(self, _ucm, _result):
+        if self._save_callback:
+            self._save_callback()
+
+    def _on_dark_changed(self, *_):
+        self.update_style()
+
+    def _js(self, script):
+        if self._ready:
+            self._webview.evaluate_javascript(script, -1, None, None, None, None)
+
+    def _js_set_content(self, text):
+        self._js(f"setContent({json.dumps(text)})")
+
+    def _apply_style_js(self):
         dark = Adw.StyleManager.get_default().get_dark()
-        scheme_id = "marklite-dark" if dark else "marklite-light"
-        scheme = sm.get_scheme(scheme_id)
-        if not scheme:
-            scheme_id = "Adwaita-dark" if dark else "Adwaita"
-            scheme = sm.get_scheme(scheme_id)
-        if scheme:
-            self._buffer.set_style_scheme(scheme)
-
-    def _apply_style(self):
-        css = (
-            f"textview {{ font-family: {self._settings.editor_font_family}; "
-            f"font-size: {self._settings.editor_font_size}pt; }}"
+        theme = json.dumps(self._settings.editor_theme)
+        dark_js = "true" if dark else "false"
+        family = json.dumps(self._settings.editor_font_family)
+        size = self._settings.editor_font_size
+        line_nums = "true" if self._settings.editor_line_numbers else "false"
+        line_wrap = "true" if self._settings.editor_line_wrap else "false"
+        self._js(
+            f"setTheme({theme}, {dark_js});"
+            f"setFont({family}, {size});"
+            f"setLineNumbers({line_nums});"
+            f"setLineWrap({line_wrap});"
         )
-        provider = Gtk.CssProvider()
-        provider.load_from_string(css)
-        self._view.get_style_context().add_provider(
-            provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
-        self._css_provider = provider
 
-    def _build_search_bar(self):
-        self._search_settings = GtkSource.SearchSettings()
-        self._search_settings.set_case_sensitive(False)
-        self._search_settings.set_wrap_around(True)
-        self._search_context = GtkSource.SearchContext(
-            buffer=self._buffer, settings=self._search_settings,
-        )
-        self._search_context.set_highlight(True)
-
-        box = Gtk.Box(spacing=4)
-        box.add_css_class("toolbar")
-        box.set_margin_start(6)
-        box.set_margin_end(6)
-        box.set_margin_top(4)
-        box.set_margin_bottom(4)
-
-        self._search_entry = Gtk.SearchEntry(hexpand=True, placeholder_text="Find in editor")
-        self._search_entry.connect("search-changed", self._on_search_changed)
-        self._search_entry.connect("activate", lambda *_: self._search_next())
-        box.append(self._search_entry)
-
-        prev_btn = Gtk.Button(icon_name="go-up-symbolic", tooltip_text="Previous match")
-        prev_btn.connect("clicked", lambda *_: self._search_prev())
-        box.append(prev_btn)
-
-        next_btn = Gtk.Button(icon_name="go-down-symbolic", tooltip_text="Next match")
-        next_btn.connect("clicked", lambda *_: self._search_next())
-        box.append(next_btn)
-
-        close_btn = Gtk.Button(icon_name="window-close-symbolic", tooltip_text="Close")
-        close_btn.connect("clicked", lambda *_: self.hide_search())
-        box.append(close_btn)
-
-        self._search_box = box
-        self._search_box.set_visible(False)
-        self.prepend(self._search_box)
-
-        key_ctl = Gtk.EventControllerKey()
-        key_ctl.connect("key-pressed", self._on_search_key)
-        self._search_entry.add_controller(key_ctl)
-
-    def _on_search_changed(self, entry):
-        self._search_settings.set_search_text(entry.get_text() or None)
-
-    def _on_search_key(self, _ctl, keyval, _keycode, _state):
-        if keyval == Gdk.KEY_Escape:
-            self.hide_search()
-            return True
-        return False
-
-    def _search_next(self):
-        cursor = self._buffer.get_iter_at_mark(self._buffer.get_insert())
-        found, start, end, _ = self._search_context.forward(cursor)
-        if found:
-            # Avoid getting stuck on current match
-            if start.equal(self._buffer.get_iter_at_mark(self._buffer.get_insert())):
-                cursor.forward_char()
-                found, start, end, _ = self._search_context.forward(cursor)
-            if found:
-                self._buffer.select_range(start, end)
-                self._view.scroll_to_iter(start, 0.2, False, 0, 0)
-
-    def _search_prev(self):
-        cursor = self._buffer.get_iter_at_mark(self._buffer.get_insert())
-        found, start, end, _ = self._search_context.backward(cursor)
-        if found:
-            self._buffer.select_range(start, end)
-            self._view.scroll_to_iter(start, 0.2, False, 0, 0)
-
-    def toggle_search(self):
-        if self._search_box.get_visible():
-            self.hide_search()
-        else:
-            self._search_box.set_visible(True)
-            self._search_entry.grab_focus()
-
-    def hide_search(self):
-        self._search_box.set_visible(False)
-        self._search_settings.set_search_text(None)
-        self._search_entry.set_text("")
-        self._view.grab_focus()
+    # ------------------------------------------------------------------
+    # Public API (same surface as the old GtkSource editor)
 
     def load_text(self, text):
-        self._buffer.set_text(text)
-        self._buffer.place_cursor(self._buffer.get_start_iter())
+        self._text_cache = text
+        self._pending_text = text
+        if self._ready:
+            GLib.idle_add(self._flush_pending)
+
+    def _flush_pending(self):
+        if self._pending_text is not None:
+            self._js_set_content(self._pending_text)
+            self._pending_text = None
+        return GLib.SOURCE_REMOVE
 
     def get_text(self):
-        start = self._buffer.get_start_iter()
-        end = self._buffer.get_end_iter()
-        return self._buffer.get_text(start, end, True)
+        return self._text_cache
+
+    def set_save_callback(self, callback):
+        self._save_callback = callback
+
+    def set_preview_callback(self, callback):
+        self._preview_callback = callback
+
+    def toggle_search(self):
+        self._js("toggleSearch()")
 
     def update_style(self):
-        self._view.get_style_context().remove_provider(self._css_provider)
-        self._apply_style()
-        self._apply_scheme()
+        self._apply_style_js()

@@ -12,6 +12,6 @@ install_data(
 )
 
 install_data(
-  'icons/hicolor/scalable/apps/de.singular.marklite-symbolic.svg',
+  'de.singular.marklite-symbolic.svg',
   install_dir: datadir / 'icons' / 'hicolor' / 'scalable' / 'apps',
 )

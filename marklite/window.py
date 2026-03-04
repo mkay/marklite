@@ -3,7 +3,7 @@ import os
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gtk, Gio
+from gi.repository import Adw, Gdk, GLib, Gtk, Gio
 
 from marklite import APP_ID, APP_NAME, VERSION
 from marklite.sidebar import Sidebar
@@ -20,6 +20,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._current_file = None
         self._editing = False
         self._watcher = None
+        self._preview_timeout_id = None
 
         self.set_default_size(settings.window_width, settings.window_height)
         self.set_title(APP_NAME)
@@ -54,6 +55,16 @@ class MainWindow(Adw.ApplicationWindow):
         self._edit_btn.set_focus_on_click(False)
         self._content_header.pack_start(self._edit_btn)
 
+        # Preview toggle (only visible while editing)
+        self._preview_btn = Gtk.ToggleButton(
+            icon_name="marklite-preview-symbolic",
+            tooltip_text="Toggle live preview",
+            active=True,
+            visible=False,
+        )
+        self._preview_btn.set_focus_on_click(False)
+        self._content_header.pack_start(self._preview_btn)
+
         # Title
         self._title_widget = Adw.WindowTitle(title=APP_NAME, subtitle="")
         self._content_header.set_title_widget(self._title_widget)
@@ -78,13 +89,31 @@ class MainWindow(Adw.ApplicationWindow):
         menu_btn.set_focus_on_click(False)
         self._content_header.pack_end(menu_btn)
 
-        # Sidebar toggle (left of menu)
+        # Sidebar toggle (left of menu button)
         self._sidebar_btn = Gtk.Button(
             icon_name="marklite-sidebar-hide-symbolic",
             tooltip_text="Toggle sidebar",
         )
         self._sidebar_btn.set_focus_on_click(False)
         self._content_header.pack_end(self._sidebar_btn)
+
+        # Export to PDF (visible when a file is open)
+        self._export_pdf_btn = Gtk.Button(
+            icon_name="marklite-export-pdf-symbolic",
+            tooltip_text="Export to PDF",
+            visible=False,
+        )
+        self._export_pdf_btn.set_focus_on_click(False)
+        self._content_header.pack_end(self._export_pdf_btn)
+
+        # Copy as rich text (visible when a file is open)
+        self._copy_rich_btn = Gtk.Button(
+            icon_name="marklite-copy-rich-text-symbolic",
+            tooltip_text="Copy as rich text",
+            visible=False,
+        )
+        self._copy_rich_btn.set_focus_on_click(False)
+        self._content_header.pack_end(self._copy_rich_btn)
 
         # Content stack
         self._stack = Gtk.Stack()
@@ -100,12 +129,37 @@ class MainWindow(Adw.ApplicationWindow):
         self._stack.add_named(self._viewer, "view")
 
         self._editor = MarkdownEditor(self._settings)
-        self._stack.add_named(self._editor, "edit")
+        self._preview_viewer = MarkdownViewer(self._settings)
+
+        self._edit_paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+        self._edit_paned.set_start_child(self._editor)
+        self._edit_paned.set_end_child(self._preview_viewer)
+        self._edit_paned.set_resize_start_child(True)
+        self._edit_paned.set_resize_end_child(True)
+        self._edit_paned.set_shrink_start_child(False)
+        self._edit_paned.set_shrink_end_child(False)
+        self._edit_paned.set_position(self._settings.window_width // 2)
+        self._stack.add_named(self._edit_paned, "edit")
 
         self._stack.set_visible_child_name("welcome")
 
+        # === Status bar ===
+        self._status_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        self._status_bar.add_css_class("toolbar")
+        self._status_bar.set_margin_start(12)
+        self._status_bar.set_margin_end(12)
+        self._status_bar.set_visible(False)
+
+        spacer = Gtk.Box(hexpand=True)
+        self._status_bar.append(spacer)
+        self._word_count_label = Gtk.Label(css_classes=["caption", "dim-label"])
+        self._reading_time_label = Gtk.Label(css_classes=["caption", "dim-label"])
+        self._status_bar.append(self._word_count_label)
+        self._status_bar.append(self._reading_time_label)
+
         content_toolbar = Adw.ToolbarView()
         content_toolbar.add_top_bar(self._content_header)
+        content_toolbar.add_bottom_bar(self._status_bar)
         content_toolbar.set_content(self._stack)
 
         # === Split View ===
@@ -125,6 +179,11 @@ class MainWindow(Adw.ApplicationWindow):
         self._doc_panel.connect("file-trashed", self._on_file_trashed)
         self._doc_panel.connect("file-renamed", self._on_file_renamed)
         self._settings.connect("changed", self._on_settings_changed)
+        self._editor.set_save_callback(self._on_editor_save)
+        self._editor.set_preview_callback(self._on_preview_text_changed)
+        self._preview_btn.connect("toggled", self._on_preview_toggled)
+        self._copy_rich_btn.connect("clicked", self._on_copy_rich_text)
+        self._export_pdf_btn.connect("clicked", self._on_export_pdf)
 
     def _setup_actions(self):
         prefs = Gio.SimpleAction.new("preferences", None)
@@ -139,6 +198,16 @@ class MainWindow(Adw.ApplicationWindow):
         find.connect("activate", self._on_find)
         self.add_action(find)
         self.get_application().set_accels_for_action("win.find", ["<Control>f"])
+
+    def _on_editor_save(self):
+        if not self._current_file or not self._editing:
+            return
+        text = self._editor.get_text()
+        try:
+            with open(self._current_file, "w", encoding="utf-8") as f:
+                f.write(text)
+        except OSError:
+            pass
 
     def _on_find(self, *_args):
         if self._editing:
@@ -169,8 +238,11 @@ class MainWindow(Adw.ApplicationWindow):
                 btn.set_active(False)
                 return
             self._editor.load_text(text)
+            if self._preview_btn.get_active():
+                self._preview_viewer.render_text(text, self._current_file)
             self._stack.set_visible_child_name("edit")
             self._editing = True
+            self._preview_btn.set_visible(True)
             self._stop_watching()
         else:
             # Exit edit mode — save and re-render
@@ -183,6 +255,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._viewer.render_text(text, self._current_file)
             self._stack.set_visible_child_name("view")
             self._editing = False
+            self._preview_btn.set_visible(False)
             self._start_watching()
 
     def _on_folder_selected(self, _sidebar, folder_path):
@@ -196,6 +269,7 @@ class MainWindow(Adw.ApplicationWindow):
                 pass
             self._editing = False
             self._edit_btn.set_active(False)
+            self._preview_btn.set_visible(False)
 
         from marklite.sidebar import Sidebar
         if folder_path == Sidebar.ALL_DOCUMENTS:
@@ -204,6 +278,9 @@ class MainWindow(Adw.ApplicationWindow):
             self._title_widget.set_subtitle(os.path.basename(folder_path))
 
         self._edit_btn.set_sensitive(False)
+        self._copy_rich_btn.set_visible(False)
+        self._export_pdf_btn.set_visible(False)
+        self._status_bar.set_visible(False)
         self._doc_panel.show_folder(folder_path)
         self._stack.set_visible_child_name("documents")
 
@@ -216,10 +293,17 @@ class MainWindow(Adw.ApplicationWindow):
     def _load_file(self, path):
         self._current_file = path
         self._edit_btn.set_sensitive(True)
+        self._copy_rich_btn.set_visible(True)
+        self._export_pdf_btn.set_visible(True)
         self._title_widget.set_subtitle(os.path.basename(path))
         self._viewer.load_file(path)
         self._stack.set_visible_child_name("view")
         self._start_watching()
+        try:
+            with open(path, encoding="utf-8") as f:
+                self._update_stats(f.read())
+        except OSError:
+            pass
 
     def _prompt_unsaved(self, next_path):
         dialog = Adw.AlertDialog(
@@ -279,7 +363,10 @@ class MainWindow(Adw.ApplicationWindow):
             self._editing = False
             self._edit_btn.set_active(False)
             self._edit_btn.set_sensitive(False)
+            self._copy_rich_btn.set_visible(False)
+            self._export_pdf_btn.set_visible(False)
             self._title_widget.set_subtitle("")
+            self._status_bar.set_visible(False)
             self._stack.set_visible_child_name("documents")
         self._sidebar.refresh()
 
@@ -294,15 +381,80 @@ class MainWindow(Adw.ApplicationWindow):
         if key == "root_directory":
             self._sidebar.refresh()
             self._doc_panel.refresh()
-        elif key in ("font_family", "font_size"):
+        elif key in ("font_family", "font_size", "viewer_theme"):
             self._viewer.update_style()
-        elif key in ("editor_font_family", "editor_font_size"):
+            self._preview_viewer.update_style()
+        elif key in ("editor_font_family", "editor_font_size",
+                     "editor_theme", "editor_line_numbers", "editor_line_wrap"):
             self._editor.update_style()
         elif key == "file_watching":
             if self._settings.file_watching:
                 self._start_watching()
             else:
                 self._stop_watching()
+
+    def _on_preview_toggled(self, btn):
+        active = btn.get_active()
+        self._preview_viewer.set_visible(active)
+        btn.set_icon_name(
+            "marklite-preview-symbolic" if active else "marklite-preview-off-symbolic"
+        )
+        if active:
+            text = self._editor.get_text()
+            self._preview_viewer.render_text(text, self._current_file)
+
+    def _on_preview_text_changed(self, text):
+        self._update_stats(text)
+        if not self._preview_btn.get_active():
+            return
+        if self._preview_timeout_id:
+            GLib.source_remove(self._preview_timeout_id)
+        self._preview_timeout_id = GLib.timeout_add(
+            150, self._do_preview_update, text
+        )
+
+    def _do_preview_update(self, text):
+        self._preview_timeout_id = None
+        self._preview_viewer.render_text(text, self._current_file)
+        return GLib.SOURCE_REMOVE
+
+    def _on_export_pdf(self, _btn):
+        if self._editing:
+            self._preview_viewer.print_pdf(self)
+        else:
+            self._viewer.print_pdf(self)
+
+    def _on_copy_rich_text(self, _btn):
+        if self._editing:
+            text = self._editor.get_text()
+        elif self._current_file:
+            try:
+                with open(self._current_file, encoding="utf-8") as f:
+                    text = f.read()
+            except OSError:
+                return
+        else:
+            return
+
+        from marklite.markdown_renderer import MarkdownRenderer
+        body = MarkdownRenderer().render(text)
+        html = f"<html><body>{body}</body></html>"
+
+        providers = [
+            Gdk.ContentProvider.new_for_bytes(
+                "text/html", GLib.Bytes.new(html.encode("utf-8"))
+            ),
+            Gdk.ContentProvider.new_for_value(text),
+        ]
+        clipboard = Gdk.Display.get_default().get_clipboard()
+        clipboard.set_content(Gdk.ContentProvider.new_union(providers))
+
+    def _update_stats(self, text):
+        words = len(text.split())
+        minutes = max(1, round(words / 200))
+        self._word_count_label.set_label(f"{words} words")
+        self._reading_time_label.set_label(f"{minutes} min read")
+        self._status_bar.set_visible(True)
 
     def _on_preferences(self, *_args):
         from marklite.settings_dialog import SettingsDialog

@@ -13,8 +13,23 @@
     <file alias="marklite-document-all-symbolic.svg">icons/hicolor/scalable/actions/marklite-document-all-symbolic.svg</file>
     <file alias="marklite-sidebar-show-symbolic.svg">icons/hicolor/scalable/actions/marklite-sidebar-show-symbolic.svg</file>
     <file alias="marklite-sidebar-hide-symbolic.svg">icons/hicolor/scalable/actions/marklite-sidebar-hide-symbolic.svg</file>
-  </gresource>
-  <gresource prefix="/de/singular/marklite/icons/hicolor/scalable/apps">
-    <file alias="de.singular.marklite.svg">icons/hicolor/scalable/apps/de.singular.marklite.svg</file>
+    <file alias="marklite-search-symbolic.svg">icons/hicolor/scalable/actions/marklite-search-symbolic.svg</file>
+    <file alias="marklite-preview-symbolic.svg">icons/hicolor/scalable/actions/marklite-preview-symbolic.svg</file>
+    <file alias="marklite-preview-off-symbolic.svg">icons/hicolor/scalable/actions/marklite-preview-off-symbolic.svg</file>
+    <file alias="marklite-format-code-symbolic.svg">icons/hicolor/scalable/actions/marklite-format-code-symbolic.svg</file>
+    <file alias="marklite-format-code-block-symbolic.svg">icons/hicolor/scalable/actions/marklite-format-code-block-symbolic.svg</file>
+    <file alias="marklite-format-quote-symbolic.svg">icons/hicolor/scalable/actions/marklite-format-quote-symbolic.svg</file>
+    <file alias="marklite-pin-symbolic.svg">icons/hicolor/scalable/actions/marklite-pin-symbolic.svg</file>
+    <file alias="marklite-export-pdf-symbolic.svg">icons/hicolor/scalable/actions/marklite-export-pdf-symbolic.svg</file>
+    <file alias="marklite-copy-rich-text-symbolic.svg">icons/hicolor/scalable/actions/marklite-copy-rich-text-symbolic.svg</file>
+    <file alias="marklite-format-bold-symbolic.svg">icons/hicolor/scalable/actions/marklite-format-bold-symbolic.svg</file>
+    <file alias="marklite-format-italic-symbolic.svg">icons/hicolor/scalable/actions/marklite-format-italic-symbolic.svg</file>
+    <file alias="marklite-format-strikethrough-symbolic.svg">icons/hicolor/scalable/actions/marklite-format-strikethrough-symbolic.svg</file>
+    <file alias="marklite-insert-link-symbolic.svg">icons/hicolor/scalable/actions/marklite-insert-link-symbolic.svg</file>
+    <file alias="marklite-list-bullet-symbolic.svg">icons/hicolor/scalable/actions/marklite-list-bullet-symbolic.svg</file>
+    <file alias="marklite-list-ordered-symbolic.svg">icons/hicolor/scalable/actions/marklite-list-ordered-symbolic.svg</file>
+    <file alias="marklite-heading-1-symbolic.svg">icons/hicolor/scalable/actions/marklite-heading-1-symbolic.svg</file>
+    <file alias="marklite-heading-2-symbolic.svg">icons/hicolor/scalable/actions/marklite-heading-2-symbolic.svg</file>
+    <file alias="marklite-heading-3-symbolic.svg">icons/hicolor/scalable/actions/marklite-heading-3-symbolic.svg</file>
   </gresource>
 </gresources>

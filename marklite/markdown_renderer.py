@@ -1,3 +1,5 @@
+import re
+
 import markdown
 
 
@@ -24,4 +26,16 @@ class MarkdownRenderer:
             extensions=self._extensions,
             extension_configs=self._extension_configs,
         )
-        return md.convert(text)
+        html = md.convert(text)
+        # Convert task-list items: <li>[ ] ... and <li>[x] ...
+        html = re.sub(
+            r"<li>\[ \]",
+            '<li class="task-item"><input type="checkbox"> ',
+            html,
+        )
+        html = re.sub(
+            r"<li>\[[xX]\]",
+            '<li class="task-item"><input type="checkbox" checked> ',
+            html,
+        )
+        return html

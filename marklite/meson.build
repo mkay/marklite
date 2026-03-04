@@ -30,6 +30,13 @@ install_subdir(
   install_dir: moduledir / 'data',
 )
 
+install_subdir(
+  'data' / 'editor',
+  install_dir: moduledir / 'data',
+  exclude_directories: ['node_modules', 'src'],
+  exclude_files: ['package.json', 'package-lock.json'],
+)
+
 gnome.compile_resources(
   'de.singular.marklite',
   'data/de.singular.marklite.gresource.xml',

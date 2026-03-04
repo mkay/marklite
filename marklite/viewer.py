@@ -1,4 +1,6 @@
+import json
 import os
+import re
 
 import gi
 gi.require_version("Gtk", "4.0")
@@ -17,9 +19,13 @@ class MarkdownViewer(Gtk.Box):
         self._renderer = MarkdownRenderer()
         self._current_path = None
 
+        self._skip_next_load = False
+
         ucm = WebKit.UserContentManager()
         ucm.register_script_message_handler("copyCode")
         ucm.connect("script-message-received::copyCode", self._on_copy_code)
+        ucm.register_script_message_handler("checkboxToggled")
+        ucm.connect("script-message-received::checkboxToggled", self._on_checkbox_toggled)
 
         self._webview = WebKit.WebView(user_content_manager=ucm)
         self._webview.set_vexpand(True)
@@ -107,6 +113,35 @@ class MarkdownViewer(Gtk.Box):
         self._find_controller.search_finish()
         self._search_entry.set_text("")
 
+    def _on_checkbox_toggled(self, _ucm, result):
+        try:
+            data = json.loads(result.to_string())
+            index = data["index"]
+            checked = data["checked"]
+        except Exception:
+            return
+        if not self._current_path:
+            return
+        try:
+            with open(self._current_path, encoding="utf-8") as f:
+                text = f.read()
+        except OSError:
+            return
+        pattern = re.compile(r'^(\s*[-*+]\s+)\[[ xX]\]', re.MULTILINE)
+        matches = list(pattern.finditer(text))
+        if index >= len(matches):
+            return
+        m = matches[index]
+        mark = "x" if checked else " "
+        bracket_pos = m.end(1) + 1  # position of the space or 'x' inside [...]
+        new_text = text[:bracket_pos] + mark + text[bracket_pos + 1:]
+        try:
+            with open(self._current_path, "w", encoding="utf-8") as f:
+                f.write(new_text)
+        except OSError:
+            return
+        self._skip_next_load = True
+
     def _on_copy_code(self, _ucm, result):
         text = result.to_string()
         clipboard = Gdk.Display.get_default().get_clipboard()
@@ -123,10 +158,15 @@ class MarkdownViewer(Gtk.Box):
             self._settings.font_family,
             self._settings.font_size,
             dark=self._is_dark(),
+            viewer_theme=self._settings.viewer_theme,
         )
         self._webview.load_html(html, "file:///")
 
     def load_file(self, path):
+        if self._skip_next_load and path == self._current_path:
+            self._skip_next_load = False
+            return
+        self._skip_next_load = False
         self._current_path = path
         try:
             with open(path, encoding="utf-8") as f:
@@ -141,7 +181,7 @@ class MarkdownViewer(Gtk.Box):
             self._current_path = path
         body = self._renderer.render(text)
         html = wrap_html(body, self._settings.font_family, self._settings.font_size,
-                         dark=self._is_dark())
+                         dark=self._is_dark(), viewer_theme=self._settings.viewer_theme)
         base_uri = "file://"
         if self._current_path:
             base_uri = "file://" + os.path.dirname(os.path.abspath(self._current_path)) + "/"
@@ -150,6 +190,10 @@ class MarkdownViewer(Gtk.Box):
     def reload(self):
         if self._current_path:
             self.load_file(self._current_path)
+
+    def print_pdf(self, parent):
+        op = WebKit.PrintOperation.new(self._webview)
+        op.run_dialog(parent)
 
     def update_style(self):
         if self._current_path:
