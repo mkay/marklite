@@ -38,19 +38,22 @@ class Application(Adw.Application):
     def _register_icons(self):
         pkg_dir = Path(__file__).parent
         gresource = pkg_dir / "data" / "de.singular.marklite.gresource"
+        gresource_xml = pkg_dir / "data" / "de.singular.marklite.gresource.xml"
+        if not gresource.exists() and gresource_xml.exists():
+            # Dev mode: compile the gresource on the fly
+            import subprocess
+            subprocess.run(
+                ["glib-compile-resources",
+                 f"--sourcedir={pkg_dir / 'data'}",
+                 str(gresource_xml),
+                 f"--target={gresource}"],
+                check=True,
+            )
         if gresource.exists():
-            # Installed / built: load the compiled bundle
             Gio.resources_register(Gio.resource_load(str(gresource)))
             Gtk.IconTheme.get_for_display(
                 Gdk.Display.get_default()
             ).add_resource_path("/de/singular/marklite/icons/hicolor")
-        else:
-            # Dev mode (source tree, not yet built): load SVGs directly
-            icon_dir = pkg_dir / "data" / "icons"
-            if icon_dir.is_dir():
-                Gtk.IconTheme.get_for_display(
-                    Gdk.Display.get_default()
-                ).add_search_path(str(icon_dir))
 
     def _load_css(self):
         css = Gtk.CssProvider()
