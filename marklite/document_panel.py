@@ -6,7 +6,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gtk, Gio, GObject, Gdk, Graphene
 
-from marklite.sidebar import Sidebar
+from marklite.sidebar import Sidebar, _count_md_files
 
 
 def _collect_subdirs(root):
@@ -114,12 +114,14 @@ class DocumentPanel(Gtk.Box):
         "file-selected": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
         "file-trashed": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
         "file-renamed": (GObject.SignalFlags.RUN_FIRST, None, (str, str)),
+        "folder-navigated": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
     }
 
     def __init__(self, settings):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self._settings = settings
         self._current_folder = None
+        self._browsing_folder = None  # actual dir being displayed (may differ from _current_folder when drilled in)
         self._context_path = None
 
         # Main scrolled area
@@ -161,9 +163,21 @@ class DocumentPanel(Gtk.Box):
         self._clear()
 
         if folder_path == Sidebar.ALL_DOCUMENTS:
+            self._browsing_folder = None
             self._show_all_documents()
+        elif folder_path == Sidebar.NO_FOLDER:
+            self._browsing_folder = self._settings.root_directory
+            self._show_single_folder(self._settings.root_directory, show_subdirs=False)
         else:
+            self._browsing_folder = folder_path
             self._show_single_folder(folder_path)
+
+    def _navigate_to(self, dir_path):
+        """Drill into a subfolder within the document panel."""
+        self._browsing_folder = dir_path
+        self._clear()
+        self._show_single_folder(dir_path)
+        self.emit("folder-navigated", dir_path)
 
     def _clear(self):
         child = self._content_box.get_first_child()
@@ -182,20 +196,71 @@ class DocumentPanel(Gtk.Box):
                 unpinned.append(f)
         return pinned, unpinned
 
-    def _show_single_folder(self, dir_path):
+    def _show_single_folder(self, dir_path, show_subdirs=True):
+        subdirs = _collect_subdirs(dir_path) if show_subdirs else []
         files = _collect_md_files(dir_path)
-        if not files:
+
+        if not files and not subdirs:
             self._scrolled.set_visible(False)
             self._empty.set_visible(True)
             return
         self._scrolled.set_visible(True)
         self._empty.set_visible(False)
 
-        pinned, unpinned = self._partition_pinned(files)
-        listbox = self._make_listbox()
-        for path in pinned + unpinned:
-            listbox.append(self._make_document_row(path))
-        self._content_box.append(listbox)
+        # Subfolder rows
+        if subdirs:
+            folder_listbox = self._make_listbox()
+            for spath, sname in subdirs:
+                folder_listbox.append(self._make_folder_row(spath, sname))
+            self._content_box.append(folder_listbox)
+
+        # Document rows
+        if files:
+            if subdirs:
+                header = Gtk.Label(
+                    label="Documents",
+                    xalign=0,
+                    css_classes=["heading"],
+                    margin_top=20,
+                    margin_bottom=6,
+                    margin_start=4,
+                )
+                self._content_box.append(header)
+
+            pinned, unpinned = self._partition_pinned(files)
+            listbox = self._make_listbox()
+            for path in pinned + unpinned:
+                listbox.append(self._make_document_row(path))
+            self._content_box.append(listbox)
+
+    def _make_folder_row(self, dir_path, name):
+        box = Gtk.Box(
+            orientation=Gtk.Orientation.HORIZONTAL,
+            spacing=8,
+            margin_start=12,
+            margin_end=12,
+            margin_top=10,
+            margin_bottom=10,
+        )
+        icon = Gtk.Image(icon_name="marklite-folder-symbolic")
+        title = Gtk.Label(
+            label=name,
+            css_classes=["heading"],
+            xalign=0,
+            hexpand=True,
+        )
+        count = _count_md_files(dir_path)
+        count_label = Gtk.Label(
+            label=str(count),
+            css_classes=["dim-label", "caption"],
+            valign=Gtk.Align.CENTER,
+        )
+        box.append(icon)
+        box.append(title)
+        box.append(count_label)
+        row = Gtk.ListBoxRow(child=box)
+        row._folder_path = dir_path
+        return row
 
     def _show_all_documents(self):
         root = self._settings.root_directory
@@ -303,7 +368,9 @@ class DocumentPanel(Gtk.Box):
         return row
 
     def _on_row_activated(self, _listbox, row):
-        if hasattr(row, "_file_path"):
+        if hasattr(row, "_folder_path"):
+            self._navigate_to(row._folder_path)
+        elif hasattr(row, "_file_path"):
             self.emit("file-selected", row._file_path)
 
     # ---- Context menu ---------------------------------------------------
@@ -599,6 +666,28 @@ class DocumentPanel(Gtk.Box):
 
     # ---- Public ---------------------------------------------------------
 
+    @property
+    def is_drilled_in(self):
+        """True when the user has navigated into a subfolder."""
+        if not self._browsing_folder or not self._current_folder:
+            return False
+        if self._current_folder in (Sidebar.ALL_DOCUMENTS, Sidebar.NO_FOLDER):
+            return False
+        return self._browsing_folder != self._current_folder
+
+    def navigate_back(self):
+        """Go up one level in the drilled-in folder hierarchy."""
+        if not self.is_drilled_in:
+            return
+        parent = os.path.dirname(self._browsing_folder)
+        self._navigate_to(parent)
+
     def refresh(self):
-        if self._current_folder:
+        if self._current_folder in (Sidebar.ALL_DOCUMENTS, Sidebar.NO_FOLDER):
+            self.show_folder(self._current_folder)
+        elif self._browsing_folder and self._browsing_folder != self._current_folder:
+            # Drilled into a subfolder — refresh in place
+            self._clear()
+            self._show_single_folder(self._browsing_folder)
+        elif self._current_folder:
             self.show_folder(self._current_folder)

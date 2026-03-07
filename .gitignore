@@ -7,3 +7,4 @@ deb-staging/
 __pycache__/
 marklite/__init__.py
 node_modules/
+*.gresource

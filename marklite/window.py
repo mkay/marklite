@@ -34,9 +34,26 @@ class MainWindow(Adw.ApplicationWindow):
     def _build_ui(self):
         # === Sidebar ToolbarView ===
         sidebar_header = Adw.HeaderBar(show_end_title_buttons=False)
-        sidebar_header.set_title_widget(
-            Gtk.Label(label=APP_NAME, css_classes=["title"])
+
+        self._root_popover = Gtk.Popover(position=Gtk.PositionType.BOTTOM)
+        self._root_popover.set_has_arrow(True)
+
+        self._root_label = Gtk.Label(
+            label=os.path.basename(self._settings.root_directory),
+            ellipsize=3,  # Pango.EllipsizeMode.END
+            css_classes=["heading"],
         )
+        self._root_btn = Gtk.MenuButton(
+            css_classes=["flat"],
+            popover=self._root_popover,
+            child=self._root_label,
+            direction=Gtk.ArrowType.NONE,
+        )
+        self._root_btn.connect("notify::active", self._on_root_btn_toggled)
+        sidebar_header.set_title_widget(self._root_btn)
+
+        # The "ceiling" is the configured root from settings (ignoring session overrides)
+        self._root_ceiling = self._settings._data.get("root_directory", self._settings.get("root_directory"))
 
         self._sidebar = Sidebar(self._settings)
 
@@ -47,6 +64,15 @@ class MainWindow(Adw.ApplicationWindow):
 
         # === Content ToolbarView ===
         self._content_header = Adw.HeaderBar(show_start_title_buttons=False)
+
+        # Back button (start, leftmost)
+        self._back_btn = Gtk.Button(
+            icon_name="marklite-go-previous-symbolic",
+            tooltip_text="Back",
+            visible=False,
+        )
+        self._back_btn.connect("clicked", self._on_back_clicked)
+        self._content_header.pack_start(self._back_btn)
 
         # Edit toggle (start)
         self._edit_btn = Gtk.ToggleButton(
@@ -201,6 +227,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._doc_panel.connect("file-selected", self._on_file_selected)
         self._doc_panel.connect("file-trashed", self._on_file_trashed)
         self._doc_panel.connect("file-renamed", self._on_file_renamed)
+        self._doc_panel.connect("folder-navigated", self._on_folder_navigated)
         self._settings.connect("changed", self._on_settings_changed)
         self._editor.set_save_callback(self._on_editor_save)
         self._editor.set_preview_callback(self._on_preview_text_changed)
@@ -302,6 +329,8 @@ class MainWindow(Adw.ApplicationWindow):
         from marklite.sidebar import Sidebar
         if folder_path == Sidebar.ALL_DOCUMENTS:
             self._title_widget.set_subtitle("All Documents")
+        elif folder_path == Sidebar.NO_FOLDER:
+            self._title_widget.set_subtitle("No Folder")
         else:
             self._title_widget.set_subtitle(os.path.basename(folder_path))
 
@@ -312,6 +341,58 @@ class MainWindow(Adw.ApplicationWindow):
         self._status_bar.set_visible(False)
         self._doc_panel.show_folder(folder_path)
         self._stack.set_visible_child_name("documents")
+        self._update_back_btn()
+
+    def _on_folder_navigated(self, _panel, folder_path):
+        self._title_widget.set_subtitle(os.path.basename(folder_path))
+        self._update_back_btn()
+
+    def _update_back_btn(self):
+        page = self._stack.get_visible_child_name()
+        if page in ("view", "edit"):
+            self._back_btn.set_visible(True)
+        elif page == "documents" and self._doc_panel.is_drilled_in:
+            self._back_btn.set_visible(True)
+        else:
+            self._back_btn.set_visible(False)
+
+    def _on_back_clicked(self, _btn):
+        page = self._stack.get_visible_child_name()
+        if page in ("view", "edit"):
+            # Exit document view — save if editing
+            if self._editing:
+                text = self._editor.get_text()
+                try:
+                    with open(self._current_file, "w", encoding="utf-8") as f:
+                        f.write(text)
+                except OSError:
+                    pass
+                self._editing = False
+                self._edit_btn.set_active(False)
+                self._preview_btn.set_visible(False)
+            self._stop_watching()
+            self._current_file = None
+            self._edit_btn.set_sensitive(False)
+            self._copy_rich_btn.set_visible(False)
+            self._export_pdf_btn.set_visible(False)
+            self._toc_btn.set_visible(False)
+            self._status_bar.set_visible(False)
+            self._doc_panel.refresh()
+            self._stack.set_visible_child_name("documents")
+            # Restore subtitle to folder name
+            from marklite.sidebar import Sidebar
+            folder = self._doc_panel._current_folder
+            if folder == Sidebar.ALL_DOCUMENTS:
+                self._title_widget.set_subtitle("All Documents")
+            elif folder == Sidebar.NO_FOLDER:
+                self._title_widget.set_subtitle("No Folder")
+            elif self._doc_panel.is_drilled_in:
+                self._title_widget.set_subtitle(os.path.basename(self._doc_panel._browsing_folder))
+            else:
+                self._title_widget.set_subtitle(os.path.basename(folder))
+        elif page == "documents" and self._doc_panel.is_drilled_in:
+            self._doc_panel.navigate_back()
+        self._update_back_btn()
 
     def _on_file_selected(self, _panel, path):
         if self._editing:
@@ -321,6 +402,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _load_file(self, path):
         self._current_file = path
+        self._back_btn.set_visible(True)
         self._edit_btn.set_sensitive(True)
         self._copy_rich_btn.set_visible(True)
         self._export_pdf_btn.set_visible(True)
@@ -412,6 +494,11 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_settings_changed(self, _mgr, key):
         if key == "root_directory":
+            # Update ceiling if this was a persistent change (not an override)
+            persisted = self._settings._data.get("root_directory")
+            if persisted and "root_directory" not in self._settings._overrides:
+                self._root_ceiling = persisted
+            self._update_root_label()
             self._sidebar.refresh()
             self._doc_panel.refresh()
         elif key in ("font_family", "font_size", "viewer_theme"):
@@ -566,3 +653,85 @@ class MainWindow(Adw.ApplicationWindow):
             comments="A lightweight GTK4 Markdown reader and editor",
         )
         about.present(self)
+
+    # ---- Root folder navigation (sidebar header) -------------------------
+
+    def _update_root_label(self):
+        self._root_label.set_label(
+            os.path.basename(self._settings.root_directory)
+        )
+
+    def _on_root_btn_toggled(self, btn, _pspec):
+        if not btn.get_active():
+            return
+
+        from marklite.sidebar import _collect_subdirs
+
+        current_root = self._settings.root_directory
+        ceiling = os.path.expanduser(self._root_ceiling)
+
+        box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL,
+            spacing=2,
+            margin_start=4,
+            margin_end=4,
+            margin_top=4,
+            margin_bottom=4,
+        )
+
+        # "Back" row if drilled deeper than ceiling
+        if os.path.normpath(current_root) != os.path.normpath(ceiling):
+            parent = os.path.dirname(current_root)
+            back_btn = Gtk.Button(css_classes=["flat"])
+            back_box = Gtk.Box(
+                orientation=Gtk.Orientation.HORIZONTAL,
+                spacing=8,
+                margin_start=6,
+                margin_end=6,
+                margin_top=4,
+                margin_bottom=4,
+            )
+            back_box.append(Gtk.Image(icon_name="marklite-go-previous-symbolic"))
+            back_box.append(Gtk.Label(
+                label=os.path.basename(parent) if parent != current_root else "Back",
+                xalign=0,
+                hexpand=True,
+            ))
+            back_btn.set_child(back_box)
+            back_btn.connect("clicked", self._on_root_nav, parent)
+            box.append(back_btn)
+            box.append(Gtk.Separator())
+
+        # Child folder rows
+        subdirs = _collect_subdirs(current_root)
+        if subdirs:
+            for dir_path, dir_name in subdirs:
+                btn = Gtk.Button(css_classes=["flat"])
+                row_box = Gtk.Box(
+                    orientation=Gtk.Orientation.HORIZONTAL,
+                    spacing=8,
+                    margin_start=6,
+                    margin_end=6,
+                    margin_top=4,
+                    margin_bottom=4,
+                )
+                row_box.append(Gtk.Image(icon_name="marklite-folder-symbolic"))
+                row_box.append(Gtk.Label(label=dir_name, xalign=0, hexpand=True))
+                btn.set_child(row_box)
+                btn.connect("clicked", self._on_root_nav, dir_path)
+                box.append(btn)
+        else:
+            box.append(Gtk.Label(
+                label="No subfolders",
+                css_classes=["dim-label"],
+                margin_start=6,
+                margin_end=6,
+                margin_top=8,
+                margin_bottom=8,
+            ))
+
+        self._root_popover.set_child(box)
+
+    def _on_root_nav(self, _btn, dir_path):
+        self._root_popover.popdown()
+        self._settings.set_override("root_directory", dir_path)

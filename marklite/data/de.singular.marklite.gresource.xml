@@ -6,7 +6,9 @@
     <file alias="marklite-document-new-symbolic.svg">icons/hicolor/scalable/actions/marklite-document-new-symbolic.svg</file>
     <file alias="marklite-folder-symbolic.svg">icons/hicolor/scalable/actions/marklite-folder-symbolic.svg</file>
     <file alias="marklite-folder-new-symbolic.svg">icons/hicolor/scalable/actions/marklite-folder-new-symbolic.svg</file>
+    <file alias="marklite-folder-striped-symbolic.svg">icons/hicolor/scalable/actions/marklite-folder-striped-symbolic.svg</file>
     <file alias="marklite-file-markdown-symbolic.svg">icons/hicolor/scalable/actions/marklite-file-markdown-symbolic.svg</file>
+    <file alias="marklite-go-previous-symbolic.svg">icons/hicolor/scalable/actions/marklite-go-previous-symbolic.svg</file>
     <file alias="marklite-go-up-symbolic.svg">icons/hicolor/scalable/actions/marklite-go-up-symbolic.svg</file>
     <file alias="marklite-go-down-symbolic.svg">icons/hicolor/scalable/actions/marklite-go-down-symbolic.svg</file>
     <file alias="marklite-close-symbolic.svg">icons/hicolor/scalable/actions/marklite-close-symbolic.svg</file>

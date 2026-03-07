@@ -9,6 +9,9 @@ A lightweight GTK4 Markdown reader and editor.
 ## Features
 
 - Folder sidebar with document panel — browse and manage markdown files
+- Subfolder navigation — drill into nested folders from the document panel
+- Root folder switcher — quickly change scope via the sidebar header
+- Open a directory from the command line: `marklite ~/path/to/notes/`
 - WebKit-based rendered markdown view with syntax highlighting
 - CodeMirror 6 editor with live preview pane
 - Dark mode — follows system theme
@@ -48,6 +51,13 @@ sudo apt install ./marklite_*.deb
 meson setup builddir --prefix=/usr
 meson compile -C builddir
 sudo meson install -C builddir
+```
+
+## Usage
+
+```bash
+marklite                    # opens the configured root directory
+marklite ~/Cloud/Notes/     # opens a specific directory (session only)
 ```
 
 ## Configuration

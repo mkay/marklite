@@ -22,6 +22,20 @@ def _count_md_files(dir_path):
     return count
 
 
+def _count_root_md_files(dir_path):
+    """Count .md files directly in dir_path (non-recursive)."""
+    count = 0
+    try:
+        for entry in os.scandir(dir_path):
+            if entry.name.startswith("."):
+                continue
+            if not entry.is_dir(follow_symlinks=False) and entry.name.lower().endswith(".md"):
+                count += 1
+    except OSError:
+        pass
+    return count
+
+
 def _collect_subdirs(root):
     """Return sorted list of (path, name) for immediate subdirectories."""
     dirs = []
@@ -41,8 +55,9 @@ class Sidebar(Gtk.Box):
         "folder-selected": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
     }
 
-    # Special sentinel for "All Documents"
+    # Special sentinels
     ALL_DOCUMENTS = "__ALL__"
+    NO_FOLDER = "__ROOT__"
 
     def __init__(self, settings):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
@@ -89,7 +104,7 @@ class Sidebar(Gtk.Box):
 
     def _active_dir(self):
         """Return the currently selected folder path (or root for All Documents)."""
-        if self._selected_path and self._selected_path != self.ALL_DOCUMENTS:
+        if self._selected_path and self._selected_path not in (self.ALL_DOCUMENTS, self.NO_FOLDER):
             return self._selected_path
         return self._settings.root_directory
 
@@ -113,6 +128,16 @@ class Sidebar(Gtk.Box):
             "marklite-document-all-symbolic",
             total,
             self.ALL_DOCUMENTS,
+        )
+        self._listbox.append(row)
+
+        # "No Folder" row (root-level files only)
+        root_count = _count_root_md_files(root)
+        row = self._make_row(
+            "No Folder",
+            "marklite-folder-striped-symbolic",
+            root_count,
+            self.NO_FOLDER,
         )
         self._listbox.append(row)
 
@@ -237,7 +262,7 @@ class Sidebar(Gtk.Box):
         is_folder = False
         if row:
             path = row._folder_path
-            is_folder = path != self.ALL_DOCUMENTS
+            is_folder = path not in (self.ALL_DOCUMENTS, self.NO_FOLDER)
             self._context_path = path if is_folder else None
         else:
             self._context_path = None
@@ -333,7 +358,7 @@ class Sidebar(Gtk.Box):
     # ---- New file / folder ----------------------------------------------
 
     def _context_dir(self):
-        if self._context_path and self._context_path != self.ALL_DOCUMENTS:
+        if self._context_path and self._context_path not in (self.ALL_DOCUMENTS, self.NO_FOLDER):
             return self._context_path
         return self._settings.root_directory
 

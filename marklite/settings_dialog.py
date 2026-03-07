@@ -1,7 +1,7 @@
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gtk
+from gi.repository import Adw, Gtk, Gio
 
 
 class SettingsDialog(Adw.PreferencesDialog):
@@ -20,9 +20,18 @@ class SettingsDialog(Adw.PreferencesDialog):
         # Directory group
         dir_group = Adw.PreferencesGroup(title="Files")
 
-        dir_row = Adw.EntryRow(title="Root Directory")
-        dir_row.set_text(self._settings.get("root_directory"))
-        dir_row.connect("changed", self._on_root_dir_changed)
+        dir_row = Adw.ActionRow(title="Root Directory")
+        dir_row.set_subtitle(self._settings.get("root_directory"))
+        dir_row.set_subtitle_lines(1)
+        dir_row.add_css_class("property")
+        choose_btn = Gtk.Button(
+            icon_name="folder-open-symbolic",
+            valign=Gtk.Align.CENTER,
+        )
+        choose_btn.connect("clicked", self._on_choose_root_dir)
+        dir_row.add_suffix(choose_btn)
+        dir_row.set_activatable_widget(choose_btn)
+        self._dir_row = dir_row
         dir_group.add(dir_row)
 
         watch_row = Adw.SwitchRow(
@@ -168,8 +177,20 @@ class SettingsDialog(Adw.PreferencesDialog):
         editor_page.add(editor_shortcuts_group)
         self.add(editor_page)
 
-    def _on_root_dir_changed(self, row):
-        self._settings.set("root_directory", row.get_text())
+    def _on_choose_root_dir(self, _btn):
+        dialog = Gtk.FileDialog(title="Choose Root Directory")
+        current = Gio.File.new_for_path(self._settings.root_directory)
+        dialog.set_initial_folder(current)
+        dialog.select_folder(self.get_root(), None, self._on_root_dir_selected)
+
+    def _on_root_dir_selected(self, dialog, result):
+        try:
+            folder = dialog.select_folder_finish(result)
+        except Exception:
+            return
+        path = folder.get_path()
+        self._settings.set("root_directory", path)
+        self._dir_row.set_subtitle(path)
 
     def _on_file_watching_changed(self, row, _pspec):
         self._settings.set("file_watching", row.get_active())
