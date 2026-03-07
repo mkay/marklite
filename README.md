@@ -15,8 +15,9 @@ A lightweight GTK4 Markdown reader and editor.
 - File management — rename, move, trash, new file/folder
 - File watching — auto-reloads on disk changes
 - Task list checkboxes — toggle directly in the rendered view
+- Table of contents popover — navigate headings, click to scroll
 - Export to PDF, copy as rich text
-- Configurable root directory, fonts, and theme
+- Configurable keyboard shortcuts, fonts, and themes
 
 ## Dependencies
 

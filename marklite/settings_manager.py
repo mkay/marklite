@@ -17,6 +17,7 @@ DEFAULTS = {
     "editor_theme": "auto",
     "editor_line_numbers": True,
     "editor_line_wrap": True,
+    "edit_shortcut": "<Control>e",
     "pinned_files": [],
     "file_watching": True,
     "window_width": 1000,
@@ -119,6 +120,10 @@ class SettingsManager(GObject.Object):
         else:
             pins.append(path)
         self.set("pinned_files", pins)
+
+    @property
+    def edit_shortcut(self):
+        return self.get("edit_shortcut")
 
     @property
     def file_watching(self):

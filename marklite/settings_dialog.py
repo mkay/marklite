@@ -157,6 +157,15 @@ class SettingsDialog(Adw.PreferencesDialog):
         editor_appearance_group.add(line_wrap_row)
 
         editor_page.add(editor_appearance_group)
+
+        editor_shortcuts_group = Adw.PreferencesGroup(title="Shortcuts")
+
+        edit_shortcut_row = Adw.EntryRow(title="Toggle Edit Mode")
+        edit_shortcut_row.set_text(self._settings.edit_shortcut)
+        edit_shortcut_row.connect("changed", self._on_edit_shortcut_changed)
+        editor_shortcuts_group.add(edit_shortcut_row)
+
+        editor_page.add(editor_shortcuts_group)
         self.add(editor_page)
 
     def _on_root_dir_changed(self, row):
@@ -189,3 +198,6 @@ class SettingsDialog(Adw.PreferencesDialog):
 
     def _on_line_wrap_changed(self, row, _pspec):
         self._settings.set("editor_line_wrap", row.get_active())
+
+    def _on_edit_shortcut_changed(self, row):
+        self._settings.set("edit_shortcut", row.get_text())

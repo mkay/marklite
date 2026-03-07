@@ -1,4 +1,5 @@
 import os
+import re
 
 import gi
 gi.require_version("Gtk", "4.0")
@@ -21,6 +22,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._editing = False
         self._watcher = None
         self._preview_timeout_id = None
+        self._toc_headings = []
 
         self.set_default_size(settings.window_width, settings.window_height)
         self.set_title(APP_NAME)
@@ -115,6 +117,27 @@ class MainWindow(Adw.ApplicationWindow):
         self._copy_rich_btn.set_focus_on_click(False)
         self._content_header.pack_end(self._copy_rich_btn)
 
+        # Table of contents popover (visible when a file is open)
+        self._toc_btn = Gtk.MenuButton(
+            icon_name="marklite-list-bullet-symbolic",
+            tooltip_text="Table of contents",
+            visible=False,
+        )
+        self._toc_btn.set_focus_on_click(False)
+        self._toc_popover = Gtk.Popover()
+        self._toc_popover.set_size_request(280, -1)
+        self._toc_list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
+        self._toc_list.add_css_class("navigation-sidebar")
+        self._toc_list.connect("row-activated", self._on_toc_row_activated)
+        scroll = Gtk.ScrolledWindow(
+            max_content_height=400,
+            propagate_natural_height=True,
+        )
+        scroll.set_child(self._toc_list)
+        self._toc_popover.set_child(scroll)
+        self._toc_btn.set_popover(self._toc_popover)
+        self._content_header.pack_end(self._toc_btn)
+
         # Content stack
         self._stack = Gtk.Stack()
         self._stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
@@ -199,6 +222,11 @@ class MainWindow(Adw.ApplicationWindow):
         self.add_action(find)
         self.get_application().set_accels_for_action("win.find", ["<Control>f"])
 
+        edit_toggle = Gio.SimpleAction.new("edit-toggle", None)
+        edit_toggle.connect("activate", self._on_edit_shortcut)
+        self.add_action(edit_toggle)
+        self._apply_edit_shortcut()
+
     def _on_editor_save(self):
         if not self._current_file or not self._editing:
             return
@@ -280,6 +308,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._edit_btn.set_sensitive(False)
         self._copy_rich_btn.set_visible(False)
         self._export_pdf_btn.set_visible(False)
+        self._toc_btn.set_visible(False)
         self._status_bar.set_visible(False)
         self._doc_panel.show_folder(folder_path)
         self._stack.set_visible_child_name("documents")
@@ -295,13 +324,16 @@ class MainWindow(Adw.ApplicationWindow):
         self._edit_btn.set_sensitive(True)
         self._copy_rich_btn.set_visible(True)
         self._export_pdf_btn.set_visible(True)
+        self._toc_btn.set_visible(True)
         self._title_widget.set_subtitle(os.path.basename(path))
         self._viewer.load_file(path)
         self._stack.set_visible_child_name("view")
         self._start_watching()
         try:
             with open(path, encoding="utf-8") as f:
-                self._update_stats(f.read())
+                text = f.read()
+            self._update_stats(text)
+            self._update_toc(text)
         except OSError:
             pass
 
@@ -365,6 +397,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._edit_btn.set_sensitive(False)
             self._copy_rich_btn.set_visible(False)
             self._export_pdf_btn.set_visible(False)
+            self._toc_btn.set_visible(False)
             self._title_widget.set_subtitle("")
             self._status_bar.set_visible(False)
             self._stack.set_visible_child_name("documents")
@@ -387,6 +420,8 @@ class MainWindow(Adw.ApplicationWindow):
         elif key in ("editor_font_family", "editor_font_size",
                      "editor_theme", "editor_line_numbers", "editor_line_wrap"):
             self._editor.update_style()
+        elif key == "edit_shortcut":
+            self._apply_edit_shortcut()
         elif key == "file_watching":
             if self._settings.file_watching:
                 self._start_watching()
@@ -405,6 +440,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_preview_text_changed(self, text):
         self._update_stats(text)
+        self._update_toc(text)
         if not self._preview_btn.get_active():
             return
         if self._preview_timeout_id:
@@ -455,6 +491,66 @@ class MainWindow(Adw.ApplicationWindow):
         self._word_count_label.set_label(f"{words} words")
         self._reading_time_label.set_label(f"{minutes} min read")
         self._status_bar.set_visible(True)
+
+    def _apply_edit_shortcut(self):
+        shortcut = self._settings.edit_shortcut
+        if shortcut:
+            self.get_application().set_accels_for_action(
+                "win.edit-toggle", [shortcut]
+            )
+        else:
+            self.get_application().set_accels_for_action("win.edit-toggle", [])
+
+    def _on_edit_shortcut(self, *_args):
+        if self._current_file:
+            self._edit_btn.set_active(not self._edit_btn.get_active())
+
+    def _parse_headings(self, text):
+        headings = []
+        for i, line in enumerate(text.splitlines(), 1):
+            m = re.match(r'^(#{1,6})\s+(.+)', line)
+            if m:
+                level = len(m.group(1))
+                title = m.group(2).strip()
+                headings.append((level, title, i))
+        return headings
+
+    def _update_toc(self, text):
+        self._toc_headings = self._parse_headings(text)
+        while True:
+            row = self._toc_list.get_row_at_index(0)
+            if row is None:
+                break
+            self._toc_list.remove(row)
+        for level, title, _line in self._toc_headings:
+            label = Gtk.Label(
+                label=title,
+                xalign=0,
+                ellipsize=3,  # Pango.EllipsizeMode.END
+            )
+            label.set_margin_start((level - 1) * 16)
+            if level == 1:
+                label.add_css_class("heading")
+            elif level >= 3:
+                label.add_css_class("dim-label")
+            self._toc_list.append(label)
+
+    def _on_toc_row_activated(self, _listbox, row):
+        self._toc_popover.popdown()
+        idx = row.get_index()
+        if idx >= len(self._toc_headings):
+            return
+        level, title, line_num = self._toc_headings[idx]
+        if self._editing:
+            self._editor._js(f"scrollToLine({line_num})")
+        else:
+            # Generate the same anchor ID that python-markdown's toc extension uses
+            anchor = re.sub(r'[^\w\s-]', '', title.lower())
+            anchor = re.sub(r'[\s]+', '-', anchor).strip('-')
+            self._viewer._webview.evaluate_javascript(
+                f"document.getElementById('{anchor}')?.scrollIntoView({{behavior:'smooth'}});",
+                -1, None, None, None, None,
+            )
 
     def _on_preferences(self, *_args):
         from marklite.settings_dialog import SettingsDialog
