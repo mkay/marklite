@@ -36,6 +36,7 @@ class SettingsManager(GObject.Object):
     def __init__(self):
         super().__init__()
         self._data = dict(DEFAULTS)
+        self._overrides = {}
         self._load()
 
     def _load(self):
@@ -58,7 +59,14 @@ class SettingsManager(GObject.Object):
             json.dump(self._data, f, indent=2)
 
     def get(self, key):
+        if key in self._overrides:
+            return self._overrides[key]
         return self._data.get(key, DEFAULTS.get(key))
+
+    def set_override(self, key, value):
+        """Set a session-only override that is not persisted to disk."""
+        self._overrides[key] = value
+        self.emit("changed", key)
 
     def set(self, key, value):
         if self._data.get(key) != value:

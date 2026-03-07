@@ -13,7 +13,7 @@ class Application(Adw.Application):
     def __init__(self):
         super().__init__(
             application_id=APP_ID,
-            flags=Gio.ApplicationFlags.DEFAULT_FLAGS,
+            flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
         )
         self.settings = SettingsManager()
 
@@ -77,6 +77,15 @@ class Application(Adw.Application):
     def _on_settings_changed(self, _mgr, key):
         if key == "theme":
             self._apply_theme()
+
+    def do_command_line(self, command_line):
+        args = command_line.get_arguments()[1:]
+        if args:
+            path = Path(args[0]).expanduser().resolve()
+            if path.is_dir():
+                self.settings.set_override("root_directory", str(path))
+        self.do_activate()
+        return 0
 
     def do_activate(self):
         win = self.get_active_window()
