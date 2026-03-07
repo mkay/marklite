@@ -1,15 +1,17 @@
 # MarkLite
 
-A lightweight GTK4 Markdown reader and editor.
+A lightweight GTK4 Markdown reader and editor for GNOME.
 
 ## Features
 
-- Sidebar file browser with expandable directories, filtered to `.md` files
+- Folder sidebar with document panel — browse and manage markdown files
 - WebKit-based rendered markdown view with syntax highlighting
-- Inline GtkSourceView editor with markdown highlighting
+- CodeMirror 6 editor with live preview pane
 - Dark mode — follows system theme
-- File management — rename, trash, new file/folder
+- File management — rename, move, trash, new file/folder
 - File watching — auto-reloads on disk changes
+- Task list checkboxes — toggle directly in the rendered view
+- Export to PDF, copy as rich text
 - Configurable root directory, fonts, and theme
 
 ## Dependencies
@@ -17,36 +19,30 @@ A lightweight GTK4 Markdown reader and editor.
 - Python 3.10+
 - GTK 4.0, libadwaita 1
 - WebKitGTK 6.0
-- GtkSourceView 5
 - python-markdown, Pygments
 - Meson, Ninja (build)
+
+## Install
 
 ### Arch Linux
 
 ```bash
-pacman -S python python-gobject gtk4 libadwaita webkitgtk-6.0 gtksourceview5 python-markdown python-pygments meson ninja
-```
-
-## Install (Arch Linux)
-
-```bash
+pacman -S python python-gobject gtk4 libadwaita webkitgtk-6.0 python-markdown python-pygments meson ninja
 makepkg -sic
 ```
 
-## Building from source
+### Debian / Ubuntu
+
+```bash
+sudo apt install ./marklite_*.deb
+```
+
+### From source
 
 ```bash
 meson setup builddir --prefix=/usr
-ninja -C builddir
+meson compile -C builddir
 sudo meson install -C builddir
-```
-
-For a user-local install:
-
-```bash
-meson setup builddir --prefix=~/.local
-ninja -C builddir
-meson install -C builddir
 ```
 
 ## Configuration
@@ -55,4 +51,4 @@ Settings are stored in `~/.config/marklite/settings.json` and can be changed fro
 
 ## Disclaimer
 
-This project was created with AI assistance. The code has not been thoroughly reviewed. Verify its correctness and suitability before use. 
+This project was created with AI assistance. The code has not been thoroughly reviewed. Verify its correctness and suitability before use.

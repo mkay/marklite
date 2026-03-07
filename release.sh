@@ -27,7 +27,17 @@ echo "==> Releasing $PROJECT_NAME $TAG"
 sed -i "0,/version: '[^']*'/{s/version: '[^']*'/version: '$VERSION'/}" meson.build
 sed -i "s/^pkgver=.*/pkgver=$VERSION/" PKGBUILD
 
-# 2. Commit (if there are changes) and tag
+# 2. Generate release notes before tagging
+PREV_TAG=$(git tag --sort=-version:refname | head -1)
+if [[ -n "$PREV_TAG" ]]; then
+    RELEASE_NOTES=$(git log --pretty=format:"- %s" "$PREV_TAG..HEAD" | grep -v -E "^- (Release |first commit)")
+else
+    RELEASE_NOTES=$(git log --pretty=format:"- %s" | grep -v -E "^- (Release |first commit)")
+fi
+echo "==> Release notes:"
+echo "$RELEASE_NOTES"
+
+# 3. Commit (if there are changes) and tag
 git add meson.build PKGBUILD
 if ! git diff --cached --quiet; then
     git commit -m "Release $TAG"
@@ -36,7 +46,7 @@ else
 fi
 git tag "$TAG"
 
-# 3. Push commit and tag to all remotes
+# 4. Push commit and tag to all remotes
 for remote in $(git remote); do
     echo "==> Pushing to $remote"
     git push "$remote" HEAD "$TAG"
@@ -75,6 +85,13 @@ version: $VERSION
 maintainer: mk
 description: $PKGDESC
 license: $PKGLICENSE
+depends:
+  - python3
+  - gir1.2-gtk-4.0
+  - gir1.2-adw-1
+  - gir1.2-webkit-6.0
+  - python3-gi
+  - python3-markdown
 contents:
 $CONTENTS
 NFPM
@@ -102,7 +119,7 @@ if [[ -n "$GITHUB_REMOTE" ]] && command -v gh &>/dev/null; then
     gh release create "$TAG" "${RELEASE_ASSETS[@]}" \
         --repo "$GH_REPO" \
         --title "$TAG" \
-        --generate-notes
+        --notes "$RELEASE_NOTES"
     echo "==> GitHub release created"
 fi
 
@@ -137,7 +154,8 @@ if [[ -n "$FORGEJO_URL" && -n "${FORGEJO_TOKEN:-}" ]]; then
     RELEASE_JSON=$(curl -s -X POST "https://$FORGEJO_URL/api/v1/repos/$REPO_PATH/releases" \
         -H "Authorization: token $FORGEJO_TOKEN" \
         -H "Content-Type: application/json" \
-        -d "{\"tag_name\":\"$TAG\",\"name\":\"$TAG\",\"body\":\"Release $TAG\",\"target_commitish\":\"$COMMIT_SHA\"}")
+        -d "$(jq -n --arg tag "$TAG" --arg body "$RELEASE_NOTES" --arg sha "$COMMIT_SHA" \
+            '{tag_name: $tag, name: $tag, body: $body, target_commitish: $sha}')")
 
     RELEASE_ID=$(echo "$RELEASE_JSON" | jq -r '.id')
 
