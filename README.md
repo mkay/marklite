@@ -1,6 +1,10 @@
 # MarkLite
 
-A lightweight GTK4 Markdown reader and editor for GNOME.
+A lightweight GTK4 Markdown reader and editor.
+
+> **Alpha software.** Still tightening the screws..
+
+![Edith Icon](data/de.singular.marklite.svg)
 
 ## Features
 
