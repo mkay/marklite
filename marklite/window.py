@@ -276,10 +276,12 @@ class MainWindow(Adw.ApplicationWindow):
         self._split_view.set_show_sidebar(not self._split_view.get_show_sidebar())
 
     def _on_split_sidebar_changed(self, split_view, _param):
-        if split_view.get_show_sidebar():
+        showing = split_view.get_show_sidebar()
+        if showing:
             self._sidebar_btn.set_icon_name("marklite-sidebar-hide-symbolic")
         else:
             self._sidebar_btn.set_icon_name("marklite-sidebar-show-symbolic")
+        self._content_header.set_show_start_title_buttons(not showing)
 
     def _on_edit_toggled(self, btn):
         if not self._current_file:
