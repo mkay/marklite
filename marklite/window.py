@@ -600,7 +600,14 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _parse_headings(self, text):
         headings = []
+        in_fence = False
         for i, line in enumerate(text.splitlines(), 1):
+            stripped = line.strip()
+            if stripped.startswith("```") or stripped.startswith("~~~"):
+                in_fence = not in_fence
+                continue
+            if in_fence:
+                continue
             m = re.match(r'^(#{1,6})\s+(.+)', line)
             if m:
                 level = len(m.group(1))
@@ -637,11 +644,8 @@ class MainWindow(Adw.ApplicationWindow):
         if self._editing:
             self._editor._js(f"scrollToLine({line_num})")
         else:
-            # Generate the same anchor ID that python-markdown's toc extension uses
-            anchor = re.sub(r'[^\w\s-]', '', title.lower())
-            anchor = re.sub(r'[\s]+', '-', anchor).strip('-')
             self._viewer._webview.evaluate_javascript(
-                f"document.getElementById('{anchor}')?.scrollIntoView({{behavior:'smooth'}});",
+                f"document.querySelectorAll('h1,h2,h3,h4,h5,h6')[{idx}]?.scrollIntoView({{behavior:'smooth'}});",
                 -1, None, None, None, None,
             )
 
