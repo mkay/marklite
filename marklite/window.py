@@ -657,6 +657,7 @@ class MainWindow(Adw.ApplicationWindow):
             version=VERSION,
             developer_name="MarkLite",
             comments="A lightweight GTK4 Markdown reader and editor",
+            license_type=Gtk.License.MIT_X11,
         )
         about.present(self)
 

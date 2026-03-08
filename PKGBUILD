@@ -4,7 +4,7 @@ pkgver=0.2.6
 pkgrel=1
 pkgdesc="A lightweight GTK4 Markdown reader and editor for GNOME"
 arch=('any')
-license=('GPL-3.0-or-later')
+license=('MIT')
 depends=(
   'python'
   'python-gobject'

@@ -66,7 +66,7 @@ Settings are stored in `~/.config/marklite/settings.json` and can be changed fro
 
 ## License
 
-GPL-3.0-or-later
+MIT
 
 ## Screenshots
 
