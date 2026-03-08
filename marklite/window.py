@@ -224,6 +224,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._split_view.connect("notify::show-sidebar", self._on_split_sidebar_changed)
         self._edit_btn.connect("toggled", self._on_edit_toggled)
         self._sidebar.connect("folder-selected", self._on_folder_selected)
+        self._sidebar.connect("changed", lambda _s: self._doc_panel.refresh())
         self._doc_panel.connect("file-selected", self._on_file_selected)
         self._doc_panel.connect("file-trashed", self._on_file_trashed)
         self._doc_panel.connect("file-renamed", self._on_file_renamed)
@@ -231,6 +232,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._settings.connect("changed", self._on_settings_changed)
         self._editor.set_save_callback(self._on_editor_save)
         self._editor.set_preview_callback(self._on_preview_text_changed)
+        self._editor.set_scroll_callback(self._on_editor_scroll)
         self._preview_btn.connect("toggled", self._on_preview_toggled)
         self._copy_rich_btn.connect("clicked", self._on_copy_rich_text)
         self._export_pdf_btn.connect("clicked", self._on_export_pdf)
@@ -540,6 +542,10 @@ class MainWindow(Adw.ApplicationWindow):
         self._preview_timeout_id = None
         self._preview_viewer.render_text(text, self._current_file)
         return GLib.SOURCE_REMOVE
+
+    def _on_editor_scroll(self, line):
+        if self._stack.get_visible_child_name() == "edit" and self._preview_btn.get_active():
+            self._preview_viewer.scroll_to_line(line)
 
     def _on_export_pdf(self, _btn):
         if self._editing:

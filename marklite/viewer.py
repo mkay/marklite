@@ -195,6 +195,12 @@ class MarkdownViewer(Gtk.Box):
         op = WebKit.PrintOperation.new(self._webview)
         op.run_dialog(parent)
 
+    def scroll_to_line(self, line):
+        self._webview.evaluate_javascript(
+            f"window.scrollToSourceLine && window.scrollToSourceLine({line})",
+            -1, None, None, None, None,
+        )
+
     def update_style(self):
         if self._current_path:
             self.reload()

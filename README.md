@@ -13,9 +13,9 @@ A lightweight GTK4 Markdown reader and editor.
 - Root folder switcher — quickly change scope via the sidebar header
 - Open a directory from the command line: `marklite ~/path/to/notes/`
 - WebKit-based rendered markdown view with syntax highlighting
-- CodeMirror 6 editor with live preview pane
+- CodeMirror 6 editor with live preview pane and scroll sync
 - Dark mode — follows system theme
-- File management — rename, move, trash, new file/folder
+- File management — rename, move, trash, delete empty folders, create documents from context menu
 - File watching — auto-reloads on disk changes
 - Task list checkboxes — toggle directly in the rendered view
 - Table of contents popover — navigate headings, click to scroll

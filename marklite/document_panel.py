@@ -123,6 +123,7 @@ class DocumentPanel(Gtk.Box):
         self._current_folder = None
         self._browsing_folder = None  # actual dir being displayed (may differ from _current_folder when drilled in)
         self._context_path = None
+        self._context_folder_path = None
 
         # Main scrolled area
         self._scrolled = Gtk.ScrolledWindow(vexpand=True)
@@ -156,6 +157,7 @@ class DocumentPanel(Gtk.Box):
         self.append(self._empty)
 
         self._setup_context_menu()
+        self._setup_pane_context_menu()
 
     def show_folder(self, folder_path):
         """Display documents for the given folder path, or all if ALL_DOCUMENTS."""
@@ -242,24 +244,55 @@ class DocumentPanel(Gtk.Box):
             margin_top=10,
             margin_bottom=10,
         )
+
         icon = Gtk.Image(icon_name="marklite-folder-symbolic")
+        icon.set_valign(Gtk.Align.START)
+
+        info_box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL,
+            hexpand=True,
+            spacing=2,
+        )
+
         title = Gtk.Label(
             label=name,
             css_classes=["heading"],
             xalign=0,
-            hexpand=True,
         )
-        count = _count_md_files(dir_path)
-        count_label = Gtk.Label(
-            label=str(count),
+
+        doc_count = _count_md_files(dir_path)
+        subdir_count = len(_collect_subdirs(dir_path))
+        parts = []
+        if doc_count:
+            parts.append(f"{doc_count} document{'s' if doc_count != 1 else ''}")
+        if subdir_count:
+            parts.append(f"{subdir_count} folder{'s' if subdir_count != 1 else ''}")
+        if not parts:
+            parts.append("Empty")
+        try:
+            mtime = os.stat(dir_path).st_mtime
+            parts.append(_format_date(mtime))
+        except OSError:
+            pass
+
+        subtitle = Gtk.Label(
+            label=" \u00b7 ".join(parts),
             css_classes=["dim-label", "caption"],
-            valign=Gtk.Align.CENTER,
+            xalign=0,
         )
+
+        info_box.append(title)
+        info_box.append(subtitle)
         box.append(icon)
-        box.append(title)
-        box.append(count_label)
+        box.append(info_box)
+
         row = Gtk.ListBoxRow(child=box)
         row._folder_path = dir_path
+
+        gesture = Gtk.GestureClick(button=Gdk.BUTTON_SECONDARY)
+        gesture.connect("pressed", self._on_folder_row_right_click, row)
+        row.add_controller(gesture)
+
         return row
 
     def _show_all_documents(self):
@@ -432,7 +465,220 @@ class DocumentPanel(Gtk.Box):
         toggle_pin_action.connect("activate", self._on_toggle_pin_activate)
         group.add_action(toggle_pin_action)
 
+        delete_folder_action = Gio.SimpleAction.new("delete-folder", None)
+        delete_folder_action.connect("activate", self._on_delete_folder_activate)
+        group.add_action(delete_folder_action)
+
+        rename_folder_action = Gio.SimpleAction.new("rename-folder", None)
+        rename_folder_action.connect("activate", self._on_rename_folder_activate)
+        group.add_action(rename_folder_action)
+
+        reveal_folder_action = Gio.SimpleAction.new("reveal-folder", None)
+        reveal_folder_action.connect("activate", self._on_reveal_folder_activate)
+        group.add_action(reveal_folder_action)
+
+        self._folder_popover = Gtk.PopoverMenu()
+        self._folder_popover.set_parent(self)
+        self._folder_popover.set_has_arrow(False)
+
         self.insert_action_group("docpanel", group)
+
+    def _setup_pane_context_menu(self):
+        """Right-click on empty area of the document pane."""
+        self._pane_popover = Gtk.PopoverMenu()
+        self._pane_popover.set_parent(self)
+        self._pane_popover.set_has_arrow(False)
+        self._pane_context_rect = Gdk.Rectangle()
+
+        menu = Gio.Menu()
+        menu.append("Create new Document here", "docpane.new-document")
+        self._pane_popover.set_menu_model(menu)
+
+        new_doc_action = Gio.SimpleAction.new("new-document", None)
+        new_doc_action.connect("activate", self._on_new_document_activate)
+        group = Gio.SimpleActionGroup()
+        group.add_action(new_doc_action)
+        self.insert_action_group("docpane", group)
+
+        gesture = Gtk.GestureClick(button=Gdk.BUTTON_SECONDARY)
+        gesture.connect("pressed", self._on_pane_right_click)
+        self._scrolled.add_controller(gesture)
+
+        gesture2 = Gtk.GestureClick(button=Gdk.BUTTON_SECONDARY)
+        gesture2.connect("pressed", self._on_pane_right_click)
+        self._empty.add_controller(gesture2)
+
+    def _on_pane_right_click(self, gesture, _n_press, x, y):
+        widget = gesture.get_widget()
+        src_point = Graphene.Point()
+        src_point.x = x
+        src_point.y = y
+        success, dest_point = widget.compute_point(self, src_point)
+        if success:
+            px, py = dest_point.x, dest_point.y
+        else:
+            px, py = x, y
+
+        self._pane_context_rect.x = int(px)
+        self._pane_context_rect.y = int(py)
+        self._pane_context_rect.width = 1
+        self._pane_context_rect.height = 1
+        self._pane_popover.set_pointing_to(self._pane_context_rect)
+        self._pane_popover.popup()
+
+    def _on_new_document_activate(self, *_args):
+        parent_dir = self._browsing_folder or self._settings.root_directory
+
+        dialog = Adw.AlertDialog(heading="New Document")
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("create", "Create")
+        dialog.set_response_appearance("create", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("create")
+        dialog.set_close_response("cancel")
+
+        entry = Gtk.Entry(text="Untitled.md")
+        entry.set_activates_default(True)
+        entry.connect("map", self._focus_and_select, 0, entry.get_text().rfind("."))
+        dialog.set_extra_child(entry)
+        dialog.connect("response", self._on_new_document_response, entry, parent_dir)
+        dialog.present(self.get_root())
+
+    def _on_new_document_response(self, _dialog, response, entry, parent_dir):
+        if response != "create":
+            return
+        name = entry.get_text().strip()
+        if not name:
+            return
+        if not name.lower().endswith(".md"):
+            name += ".md"
+        path = os.path.join(parent_dir, name)
+        if os.path.exists(path):
+            return
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(f"# {os.path.splitext(name)[0]}\n")
+        except OSError:
+            return
+        self.refresh()
+
+    def _build_folder_context_menu(self):
+        section = Gio.Menu()
+        section.append("Rename", "docpanel.rename-folder")
+        section.append("Delete Folder", "docpanel.delete-folder")
+        section.append("Reveal in File Manager", "docpanel.reveal-folder")
+        menu = Gio.Menu()
+        menu.append_section(None, section)
+        return menu
+
+    def _on_folder_row_right_click(self, gesture, _n_press, x, y, row):
+        self._context_folder_path = row._folder_path
+        self._folder_popover.set_menu_model(self._build_folder_context_menu())
+
+        src_point = Graphene.Point()
+        src_point.x = x
+        src_point.y = y
+        success, dest_point = row.compute_point(self, src_point)
+        if success:
+            px, py = dest_point.x, dest_point.y
+        else:
+            px, py = x, y
+
+        self._context_rect.x = int(px)
+        self._context_rect.y = int(py)
+        self._context_rect.width = 1
+        self._context_rect.height = 1
+        self._folder_popover.set_pointing_to(self._context_rect)
+        self._folder_popover.popup()
+
+    def _is_dir_empty(self, path):
+        try:
+            for entry in os.scandir(path):
+                if not entry.name.startswith("."):
+                    return False
+        except OSError:
+            pass
+        return True
+
+    def _on_delete_folder_activate(self, *_args):
+        if not self._context_folder_path:
+            return
+        name = os.path.basename(self._context_folder_path)
+
+        if not self._is_dir_empty(self._context_folder_path):
+            dialog = Adw.AlertDialog(
+                heading="Folder is not empty",
+                body=f"\u201c{name}\u201d still contains files or folders.\nRemove its contents first.",
+            )
+            dialog.add_response("ok", "OK")
+            dialog.set_default_response("ok")
+            dialog.set_close_response("ok")
+            dialog.present(self.get_root())
+            return
+
+        dialog = Adw.AlertDialog(
+            heading="Delete Folder?",
+            body=f"\u201c{name}\u201d will be deleted.",
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("delete", "Delete")
+        dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_default_response("cancel")
+        dialog.set_close_response("cancel")
+        dialog.connect("response", self._on_delete_folder_response, self._context_folder_path)
+        dialog.present(self.get_root())
+
+    def _on_delete_folder_response(self, _dialog, response, path):
+        if response != "delete":
+            return
+        try:
+            os.rmdir(path)
+        except OSError:
+            return
+        self.refresh()
+
+    def _on_rename_folder_activate(self, *_args):
+        if not self._context_folder_path:
+            return
+        name = os.path.basename(self._context_folder_path)
+        dialog = Adw.AlertDialog(
+            heading="Rename",
+            body=f"Enter a new name for \u201c{name}\u201d:",
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("rename", "Rename")
+        dialog.set_response_appearance("rename", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("rename")
+        dialog.set_close_response("cancel")
+
+        entry = Gtk.Entry(text=name)
+        entry.set_activates_default(True)
+        entry.connect("map", self._focus_and_select, 0, len(name))
+        dialog.set_extra_child(entry)
+        dialog.connect("response", self._on_rename_folder_response, self._context_folder_path, entry)
+        dialog.present(self.get_root())
+
+    def _on_rename_folder_response(self, _dialog, response, old_path, entry):
+        if response != "rename":
+            return
+        new_name = entry.get_text().strip()
+        old_name = os.path.basename(old_path)
+        if not new_name or new_name == old_name:
+            return
+        new_path = os.path.join(os.path.dirname(old_path), new_name)
+        if os.path.exists(new_path):
+            return
+        try:
+            os.rename(old_path, new_path)
+        except OSError:
+            return
+        self.refresh()
+
+    def _on_reveal_folder_activate(self, *_args):
+        if not self._context_folder_path:
+            return
+        gfile = Gio.File.new_for_path(self._context_folder_path)
+        launcher = Gtk.FileLauncher.new(gfile)
+        launcher.open_containing_folder(self.get_root(), None, None)
 
     def _on_row_right_click(self, gesture, _n_press, x, y, row):
         self._context_path = row._file_path

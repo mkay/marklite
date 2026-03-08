@@ -53,6 +53,7 @@ def _collect_subdirs(root):
 class Sidebar(Gtk.Box):
     __gsignals__ = {
         "folder-selected": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
+        "changed": (GObject.SignalFlags.RUN_FIRST, None, ()),
     }
 
     # Special sentinels
@@ -83,7 +84,7 @@ class Sidebar(Gtk.Box):
 
         new_file_btn = Gtk.Button(
             icon_name="marklite-document-new-symbolic",
-            tooltip_text="New File",
+            tooltip_text="New Document",
             hexpand=True,
         )
         new_file_btn.connect("clicked", lambda _b: self._new_file(self._active_dir()))
@@ -203,11 +204,11 @@ class Sidebar(Gtk.Box):
     def _setup_context_menu(self):
         item_section = Gio.Menu()
         item_section.append("Rename", "sidebar.rename")
-        item_section.append("Move to Trash", "sidebar.trash")
+        item_section.append("Delete Folder", "sidebar.trash")
         item_section.append("Reveal in File Manager", "sidebar.reveal")
 
         new_section = Gio.Menu()
-        new_section.append("New File", "sidebar.new-file")
+        new_section.append("New Document", "sidebar.new-file")
         new_section.append("New Folder", "sidebar.new-dir")
 
         misc_section = Gio.Menu()
@@ -290,16 +291,38 @@ class Sidebar(Gtk.Box):
 
     # ---- Trash ----------------------------------------------------------
 
+    def _is_dir_empty(self, path):
+        """Check if directory has no visible (non-dot) entries."""
+        try:
+            for entry in os.scandir(path):
+                if not entry.name.startswith("."):
+                    return False
+        except OSError:
+            pass
+        return True
+
     def _on_trash_activate(self, *_args):
         if not self._context_path:
             return
         name = os.path.basename(self._context_path)
+
+        if os.path.isdir(self._context_path) and not self._is_dir_empty(self._context_path):
+            dialog = Adw.AlertDialog(
+                heading="Folder is not empty",
+                body=f"\u201c{name}\u201d still contains files or folders.\nRemove its contents first.",
+            )
+            dialog.add_response("ok", "OK")
+            dialog.set_default_response("ok")
+            dialog.set_close_response("ok")
+            dialog.present(self.get_root())
+            return
+
         dialog = Adw.AlertDialog(
-            heading="Move to Trash?",
-            body=f"\u201c{name}\u201d will be moved to the trash.",
+            heading="Delete Folder?",
+            body=f"\u201c{name}\u201d will be deleted.",
         )
         dialog.add_response("cancel", "Cancel")
-        dialog.add_response("trash", "Move to Trash")
+        dialog.add_response("trash", "Delete")
         dialog.set_response_appearance("trash", Adw.ResponseAppearance.DESTRUCTIVE)
         dialog.set_default_response("cancel")
         dialog.set_close_response("cancel")
@@ -309,10 +332,9 @@ class Sidebar(Gtk.Box):
     def _on_trash_response(self, _dialog, response, path):
         if response != "trash":
             return
-        gfile = Gio.File.new_for_path(path)
         try:
-            gfile.trash(None)
-        except Exception:
+            os.rmdir(path)
+        except OSError:
             return
         self.refresh()
 
@@ -381,7 +403,7 @@ class Sidebar(Gtk.Box):
         folder_paths = [root] + [p for p, _ in subdirs]
         folder_names = ["No Folder"] + [n for _, n in subdirs]
 
-        dialog = Adw.AlertDialog(heading="New File")
+        dialog = Adw.AlertDialog(heading="New Document")
         dialog.add_response("cancel", "Cancel")
         dialog.add_response("create", "Create")
         dialog.set_response_appearance("create", Adw.ResponseAppearance.SUGGESTED)
@@ -479,6 +501,7 @@ class Sidebar(Gtk.Box):
 
     def refresh(self):
         self._populate()
+        self.emit("changed")
 
     def get_selected_folder(self):
         return self._selected_path

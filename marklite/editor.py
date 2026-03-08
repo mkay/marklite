@@ -23,12 +23,15 @@ class MarkdownEditor(Gtk.Box):
         self._pending_text = None
         self._save_callback = None
         self._preview_callback = None
+        self._scroll_callback = None
 
         ucm = WebKit.UserContentManager()
         ucm.register_script_message_handler("textChanged")
         ucm.register_script_message_handler("saveRequest")
+        ucm.register_script_message_handler("scrollLine")
         ucm.connect("script-message-received::textChanged", self._on_text_changed)
         ucm.connect("script-message-received::saveRequest", self._on_save_request)
+        ucm.connect("script-message-received::scrollLine", self._on_scroll_line)
 
         self._webview = WebKit.WebView(user_content_manager=ucm)
         self._webview.set_vexpand(True)
@@ -127,6 +130,14 @@ class MarkdownEditor(Gtk.Box):
         if self._save_callback:
             self._save_callback()
 
+    def _on_scroll_line(self, _ucm, result):
+        try:
+            line = int(result.to_string())
+        except (ValueError, TypeError):
+            return
+        if self._scroll_callback:
+            self._scroll_callback(line)
+
     def _on_dark_changed(self, *_):
         self.update_style()
 
@@ -175,6 +186,9 @@ class MarkdownEditor(Gtk.Box):
 
     def set_preview_callback(self, callback):
         self._preview_callback = callback
+
+    def set_scroll_callback(self, callback):
+        self._scroll_callback = callback
 
     def toggle_search(self):
         self._js("toggleSearch()")

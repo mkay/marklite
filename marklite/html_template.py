@@ -235,6 +235,18 @@ document.addEventListener("DOMContentLoaded", function() {{
         pre.appendChild(btn);
     }});
 }});
+window.scrollToSourceLine = function(line) {{
+    // Find the element with the closest data-source-line <= line
+    var els = document.querySelectorAll("[data-source-line]");
+    if (!els.length) return;
+    var best = els[0];
+    for (var i = 0; i < els.length; i++) {{
+        var n = parseInt(els[i].getAttribute("data-source-line"), 10);
+        if (n <= line) best = els[i];
+        else break;
+    }}
+    best.scrollIntoView({{ behavior: "smooth", block: "start" }});
+}};
 </script>
 </body>
 </html>"""
