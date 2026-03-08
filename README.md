@@ -64,6 +64,16 @@ marklite ~/Cloud/Notes/     # opens a specific directory (session only)
 
 Settings are stored in `~/.config/marklite/settings.json` and can be changed from the Preferences dialog. All changes take effect immediately.
 
+## License
+
+GPL-3.0-or-later
+
+## Screenshots
+
+![View screen](assets/marklite_view.png)
+
+![Editor screen](assets/marklite_edit.png)
+
 ## Disclaimer
 
 This project was created with AI assistance. The code has not been thoroughly reviewed. Verify its correctness and suitability before use.
