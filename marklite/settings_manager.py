@@ -20,6 +20,8 @@ DEFAULTS = {
     "edit_shortcut": "<Control>e",
     "pinned_files": [],
     "file_watching": True,
+    "remember_last_folder": False,
+    "last_root_folder": "",
     "window_width": 1000,
     "window_height": 700,
 }

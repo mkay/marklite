@@ -94,6 +94,7 @@ class MarkdownRenderer:
         md = markdown.Markdown(
             extensions=self._extensions,
             extension_configs=self._extension_configs,
+            tab_length=2,
         )
         md._source_lines = text.splitlines()
         html = md.convert(text)

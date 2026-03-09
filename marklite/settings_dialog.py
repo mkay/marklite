@@ -42,6 +42,17 @@ class SettingsDialog(Adw.PreferencesDialog):
         watch_row.connect("notify::active", self._on_file_watching_changed)
         dir_group.add(watch_row)
 
+        remember_row = Adw.SwitchRow(
+            title="Remember Last Folder",
+            subtitle="Restore the last navigated folder on startup",
+        )
+        remember_row.set_active(self._settings.get("remember_last_folder"))
+        remember_row.connect(
+            "notify::active",
+            lambda row, _: self._settings.set("remember_last_folder", row.get_active()),
+        )
+        dir_group.add(remember_row)
+
         general_page.add(dir_group)
 
         # Theme group

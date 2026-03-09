@@ -27,9 +27,16 @@ class MainWindow(Adw.ApplicationWindow):
         self.set_default_size(settings.window_width, settings.window_height)
         self.set_title(APP_NAME)
 
+        # Restore last navigated folder if the feature is enabled
+        if settings.get("remember_last_folder"):
+            last = settings.get("last_root_folder")
+            if last and os.path.isdir(last):
+                settings.set_override("root_directory", last)
+
         self._build_ui()
         self._connect_signals()
         self._setup_actions()
+        self.connect("close-request", self._on_close_request)
 
     def _build_ui(self):
         # === Sidebar ToolbarView ===
@@ -103,6 +110,9 @@ class MainWindow(Adw.ApplicationWindow):
         window_section.append("New Window", "app.new-window")
         window_section.append("Window Size", "app.window-size")
         menu.append_section(None, window_section)
+        file_section = Gio.Menu()
+        file_section.append("Export to PDF", "win.export-pdf")
+        menu.append_section(None, file_section)
         prefs_section = Gio.Menu()
         prefs_section.append("Preferences", "win.preferences")
         menu.append_section(None, prefs_section)
@@ -125,14 +135,14 @@ class MainWindow(Adw.ApplicationWindow):
         self._sidebar_btn.set_focus_on_click(False)
         self._content_header.pack_end(self._sidebar_btn)
 
-        # Export to PDF (visible when a file is open)
-        self._export_pdf_btn = Gtk.Button(
-            icon_name="marklite-export-pdf-symbolic",
-            tooltip_text="Export to PDF",
+        # Open In (visible when a file is open, disabled while editing)
+        self._open_in_btn = Gtk.Button(
+            icon_name="marklite-open-with-symbolic",
+            tooltip_text="Open in…",
             visible=False,
         )
-        self._export_pdf_btn.set_focus_on_click(False)
-        self._content_header.pack_end(self._export_pdf_btn)
+        self._open_in_btn.set_focus_on_click(False)
+        self._content_header.pack_end(self._open_in_btn)
 
         # Copy as rich text (visible when a file is open)
         self._copy_rich_btn = Gtk.Button(
@@ -235,7 +245,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._editor.set_scroll_callback(self._on_editor_scroll)
         self._preview_btn.connect("toggled", self._on_preview_toggled)
         self._copy_rich_btn.connect("clicked", self._on_copy_rich_text)
-        self._export_pdf_btn.connect("clicked", self._on_export_pdf)
+        self._open_in_btn.connect("clicked", self._on_open_in)
 
     def _setup_actions(self):
         prefs = Gio.SimpleAction.new("preferences", None)
@@ -255,6 +265,11 @@ class MainWindow(Adw.ApplicationWindow):
         edit_toggle.connect("activate", self._on_edit_shortcut)
         self.add_action(edit_toggle)
         self._apply_edit_shortcut()
+
+        self._export_pdf_action = Gio.SimpleAction.new("export-pdf", None)
+        self._export_pdf_action.set_enabled(False)
+        self._export_pdf_action.connect("activate", self._on_export_pdf)
+        self.add_action(self._export_pdf_action)
 
     def _on_editor_save(self):
         if not self._current_file or not self._editing:
@@ -302,6 +317,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._stack.set_visible_child_name("edit")
             self._editing = True
             self._preview_btn.set_visible(True)
+            self._open_in_btn.set_sensitive(False)
             self._stop_watching()
         else:
             # Exit edit mode — save and re-render
@@ -315,6 +331,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._stack.set_visible_child_name("view")
             self._editing = False
             self._preview_btn.set_visible(False)
+            self._open_in_btn.set_sensitive(True)
             self._start_watching()
 
     def _on_folder_selected(self, _sidebar, folder_path):
@@ -340,7 +357,8 @@ class MainWindow(Adw.ApplicationWindow):
 
         self._edit_btn.set_sensitive(False)
         self._copy_rich_btn.set_visible(False)
-        self._export_pdf_btn.set_visible(False)
+        self._open_in_btn.set_visible(False)
+        self._export_pdf_action.set_enabled(False)
         self._toc_btn.set_visible(False)
         self._status_bar.set_visible(False)
         self._doc_panel.show_folder(folder_path)
@@ -378,7 +396,8 @@ class MainWindow(Adw.ApplicationWindow):
             self._current_file = None
             self._edit_btn.set_sensitive(False)
             self._copy_rich_btn.set_visible(False)
-            self._export_pdf_btn.set_visible(False)
+            self._open_in_btn.set_visible(False)
+            self._export_pdf_action.set_enabled(False)
             self._toc_btn.set_visible(False)
             self._status_bar.set_visible(False)
             self._doc_panel.refresh()
@@ -409,7 +428,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._back_btn.set_visible(True)
         self._edit_btn.set_sensitive(True)
         self._copy_rich_btn.set_visible(True)
-        self._export_pdf_btn.set_visible(True)
+        self._open_in_btn.set_visible(True)
+        self._export_pdf_action.set_enabled(True)
         self._toc_btn.set_visible(True)
         self._title_widget.set_subtitle(os.path.basename(path))
         self._viewer.load_file(path)
@@ -482,7 +502,8 @@ class MainWindow(Adw.ApplicationWindow):
             self._edit_btn.set_active(False)
             self._edit_btn.set_sensitive(False)
             self._copy_rich_btn.set_visible(False)
-            self._export_pdf_btn.set_visible(False)
+            self._open_in_btn.set_visible(False)
+            self._export_pdf_action.set_enabled(False)
             self._toc_btn.set_visible(False)
             self._title_widget.set_subtitle("")
             self._status_bar.set_visible(False)
@@ -549,11 +570,73 @@ class MainWindow(Adw.ApplicationWindow):
         if self._stack.get_visible_child_name() == "edit" and self._preview_btn.get_active():
             self._preview_viewer.scroll_to_line(line)
 
-    def _on_export_pdf(self, _btn):
+    def _on_export_pdf(self, *_args):
         if self._editing:
             self._preview_viewer.print_pdf(self)
         else:
             self._viewer.print_pdf(self)
+
+    def _on_open_in(self, btn):
+        if not self._current_file:
+            return
+
+        apps, seen = [], set()
+        for mime in ("text/markdown", "text/plain"):
+            for app in Gio.AppInfo.get_recommended_for_type(mime):
+                aid = app.get_id()
+                if aid and aid not in seen and "marklite" not in aid:
+                    apps.append(app)
+                    seen.add(aid)
+
+        if not apps:
+            return
+
+        popover = Gtk.Popover()
+        popover.set_parent(btn)
+        popover.set_has_arrow(True)
+
+        box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL,
+            spacing=2,
+            margin_start=4,
+            margin_end=4,
+            margin_top=4,
+            margin_bottom=4,
+        )
+        for app in apps:
+            row_btn = Gtk.Button()
+            row_btn.add_css_class("flat")
+            row_box = Gtk.Box(
+                orientation=Gtk.Orientation.HORIZONTAL,
+                spacing=10,
+                margin_start=6,
+                margin_end=6,
+                margin_top=4,
+                margin_bottom=4,
+            )
+            icon = app.get_icon()
+            if icon:
+                img = Gtk.Image.new_from_gicon(icon)
+            else:
+                img = Gtk.Image.new_from_icon_name("application-x-executable-symbolic")
+            img.set_icon_size(Gtk.IconSize.NORMAL)
+            row_box.append(img)
+            row_box.append(Gtk.Label(label=app.get_display_name(), xalign=0))
+            row_btn.set_child(row_box)
+            row_btn.connect("clicked", self._launch_file_with_app, app, popover)
+            box.append(row_btn)
+
+        popover.set_child(box)
+        popover.popup()
+
+    def _launch_file_with_app(self, _btn, app, popover):
+        popover.popdown()
+        if self._current_file:
+            uri = Gio.File.new_for_path(self._current_file).get_uri()
+            try:
+                app.launch_uris([uri], None)
+            except Exception:
+                pass
 
     def _on_copy_rich_text(self, _btn):
         if self._editing:
@@ -650,6 +733,11 @@ class MainWindow(Adw.ApplicationWindow):
                 f"document.querySelectorAll('h1,h2,h3,h4,h5,h6')[{idx}]?.scrollIntoView({{behavior:'smooth'}});",
                 -1, None, None, None, None,
             )
+
+    def _on_close_request(self, _win):
+        if self._settings.get("remember_last_folder"):
+            self._settings.set("last_root_folder", self._settings.root_directory)
+        return False
 
     def _on_preferences(self, *_args):
         from marklite.settings_dialog import SettingsDialog

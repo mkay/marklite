@@ -4,7 +4,7 @@ A lightweight GTK4 Markdown reader and editor.
 
 > **Alpha software.** Still tightening the screws..
 
-![Edith Icon](data/de.singular.marklite.svg)
+![MarkLite Icon](data/de.singular.marklite.svg)
 
 ## Features
 
@@ -19,7 +19,8 @@ A lightweight GTK4 Markdown reader and editor.
 - File watching — auto-reloads on disk changes
 - Task list checkboxes — toggle directly in the rendered view
 - Table of contents popover — navigate headings, click to scroll
-- Export to PDF, copy as rich text
+- Export to PDF (via menu), open in external app, copy as rich text
+- Remember last folder across sessions (optional, in Preferences)
 - Configurable keyboard shortcuts, fonts, and themes
 
 ## Dependencies
