@@ -5,7 +5,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gtk, Gio
 
-from marklite import APP_ID, VERSION
+from marklite import APP_ID
 from marklite.settings_manager import SettingsManager
 
 
