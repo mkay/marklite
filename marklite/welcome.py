@@ -15,7 +15,7 @@ class WelcomeView(Adw.Bin):
         status = Adw.StatusPage(
             icon_name="de.singular.marklite-symbolic",
             title=f"Welcome to {APP_NAME}",
-            description=f"Your Markdown Librarian\nVersion {VERSION}\n\nMarklite is alpha software\nFeatures may appear, disappear, or spontaneously improve.\n\nSelect a Markdown file from the sidebar.",
+            description=f"Your Markdown Librarian\nVersion {VERSION}\n\nMarklite is alpha software\nFeatures may appear, disappear, or spontaneously improve.\n\nSelect a Markdown file from the sidebar.",  # nosec B608
             vexpand=True,
             hexpand=True,
         )

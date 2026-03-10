@@ -773,7 +773,7 @@ class DocumentPanel(Gtk.Box):
         uri = Gio.File.new_for_path(self._context_path).get_uri()
         try:
             app.launch_uris([uri], None)
-        except Exception:
+        except Exception:  # nosec B110
             pass
 
     def _on_reveal_activate(self, *_args):

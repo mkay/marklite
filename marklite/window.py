@@ -6,7 +6,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, GLib, Gtk, Gio
 
-from marklite import APP_ID, APP_NAME, VERSION
+from marklite import APP_NAME, VERSION
 from marklite.sidebar import Sidebar
 from marklite.document_panel import DocumentPanel
 from marklite.viewer import MarkdownViewer
@@ -482,7 +482,7 @@ class MainWindow(Adw.ApplicationWindow):
         try:
             from marklite.file_watcher import FileWatcher
             self._watcher = FileWatcher(self._current_file, self._on_file_changed)
-        except Exception:
+        except Exception:  # nosec B110
             pass
 
     def _stop_watching(self):
@@ -635,7 +635,7 @@ class MainWindow(Adw.ApplicationWindow):
             uri = Gio.File.new_for_path(self._current_file).get_uri()
             try:
                 app.launch_uris([uri], None)
-            except Exception:
+            except Exception:  # nosec B110
                 pass
 
     def _on_copy_rich_text(self, _btn):

@@ -3,9 +3,9 @@ from pathlib import Path
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gdk, Gtk, Gio, GLib
+from gi.repository import Adw, Gdk, Gtk, Gio
 
-from marklite import APP_ID, APP_NAME, VERSION
+from marklite import APP_ID, VERSION
 from marklite.settings_manager import SettingsManager
 
 
@@ -41,8 +41,8 @@ class Application(Adw.Application):
         gresource_xml = pkg_dir / "data" / "de.singular.marklite.gresource.xml"
         if not gresource.exists() and gresource_xml.exists():
             # Dev mode: compile the gresource on the fly
-            import subprocess
-            subprocess.run(
+            import subprocess  # nosec B404
+            subprocess.run(  # nosec B603 B607
                 ["glib-compile-resources",
                  f"--sourcedir={pkg_dir / 'data'}",
                  str(gresource_xml),

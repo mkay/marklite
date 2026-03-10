@@ -55,7 +55,7 @@ done
 # 4. Build Arch package
 echo "==> Building Arch package"
 makepkg -sf --noconfirm
-ARCH_PKG=$(ls -t *.pkg.tar.zst 2>/dev/null | grep -v debug | head -1)
+ARCH_PKG=$(ls -t ./*.pkg.tar.zst 2>/dev/null | grep -v debug | head -1)
 
 # 5. Build .deb package via meson install + nfpm
 echo "==> Building .deb package"
