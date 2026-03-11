@@ -19,6 +19,7 @@ DEFAULTS = {
     "editor_line_wrap": True,
     "edit_shortcut": "<Control>e",
     "pinned_files": [],
+    "pinned_folders": [],
     "file_watching": True,
     "remember_last_folder": False,
     "last_root_folder": "",
@@ -51,9 +52,11 @@ class SettingsManager(GObject.Object):
                         self._data[k] = v
             except (json.JSONDecodeError, OSError):
                 pass
-        # Ensure pinned_files is always a list
+        # Ensure pinned_files / pinned_folders are always lists
         if not isinstance(self._data.get("pinned_files"), list):
             self._data["pinned_files"] = []
+        if not isinstance(self._data.get("pinned_folders"), list):
+            self._data["pinned_folders"] = []
 
     def _save(self):
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -130,6 +133,38 @@ class SettingsManager(GObject.Object):
         else:
             pins.append(path)
         self.set("pinned_files", pins)
+
+    @property
+    def pinned_folders(self):
+        return self.get("pinned_folders")
+
+    def is_folder_pinned(self, path):
+        return path in self.pinned_folders
+
+    def toggle_folder_pin(self, path):
+        pins = list(self.pinned_folders)
+        if path in pins:
+            pins.remove(path)
+        else:
+            pins.append(path)
+        self.set("pinned_folders", pins)
+
+    def cleanup_stale_pins(self):
+        """Remove pinned file/folder paths that no longer exist on disk."""
+        changed = False
+
+        valid_files = [p for p in self.pinned_files if os.path.exists(p)]
+        if len(valid_files) != len(self.pinned_files):
+            self._data["pinned_files"] = valid_files
+            changed = True
+
+        valid_folders = [p for p in self.pinned_folders if os.path.exists(p)]
+        if len(valid_folders) != len(self.pinned_folders):
+            self._data["pinned_folders"] = valid_folders
+            changed = True
+
+        if changed:
+            self._save()
 
     @property
     def edit_shortcut(self):

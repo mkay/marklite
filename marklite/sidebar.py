@@ -142,15 +142,14 @@ class Sidebar(Gtk.Box):
         )
         self._listbox.append(row)
 
-        # One row per subdirectory
-        for dir_path, dir_name in _collect_subdirs(root):
+        # One row per subdirectory — pinned folders first
+        subdirs = _collect_subdirs(root)
+        pinned_dirs = [(p, n) for p, n in subdirs if self._settings.is_folder_pinned(p)]
+        unpinned_dirs = [(p, n) for p, n in subdirs if not self._settings.is_folder_pinned(p)]
+        for dir_path, dir_name in pinned_dirs + unpinned_dirs:
             count = _count_md_files(dir_path)
-            row = self._make_row(
-                dir_name,
-                "marklite-folder-symbolic",
-                count,
-                dir_path,
-            )
+            icon = "marklite-pin-symbolic" if self._settings.is_folder_pinned(dir_path) else "marklite-folder-symbolic"
+            row = self._make_row(dir_name, icon, count, dir_path)
             self._listbox.append(row)
 
         # Reconnect and select "All Documents" by default
@@ -202,24 +201,7 @@ class Sidebar(Gtk.Box):
     # ---- Context menu ---------------------------------------------------
 
     def _setup_context_menu(self):
-        item_section = Gio.Menu()
-        item_section.append("Rename", "sidebar.rename")
-        item_section.append("Delete Folder", "sidebar.trash")
-        item_section.append("Reveal in File Manager", "sidebar.reveal")
-
-        new_section = Gio.Menu()
-        new_section.append("New Document", "sidebar.new-file")
-        new_section.append("New Folder", "sidebar.new-dir")
-
-        misc_section = Gio.Menu()
-        misc_section.append("Refresh", "sidebar.refresh")
-
-        menu = Gio.Menu()
-        menu.append_section(None, item_section)
-        menu.append_section(None, new_section)
-        menu.append_section(None, misc_section)
-
-        self._popover = Gtk.PopoverMenu(menu_model=menu)
+        self._popover = Gtk.PopoverMenu()
         self._popover.set_parent(self._listbox)
         self._popover.set_has_arrow(False)
 
@@ -252,11 +234,48 @@ class Sidebar(Gtk.Box):
         refresh_action.connect("activate", lambda *_: self.refresh())
         group.add_action(refresh_action)
 
+        copy_path_action = Gio.SimpleAction.new("copy-path", None)
+        copy_path_action.connect("activate", self._on_copy_path_activate)
+        group.add_action(copy_path_action)
+        self._copy_path_action = copy_path_action
+
+        pin_action = Gio.SimpleAction.new("pin", None)
+        pin_action.connect("activate", self._on_pin_activate)
+        group.add_action(pin_action)
+        self._pin_action = pin_action
+
         self._listbox.insert_action_group("sidebar", group)
 
         gesture = Gtk.GestureClick(button=Gdk.BUTTON_SECONDARY)
         gesture.connect("pressed", self._on_right_click)
         self._listbox.add_controller(gesture)
+
+    def _build_menu(self, is_folder, is_pinned):
+        menu = Gio.Menu()
+
+        if is_folder:
+            pin_section = Gio.Menu()
+            pin_section.append("Unpin" if is_pinned else "Pin to Top", "sidebar.pin")
+            menu.append_section(None, pin_section)
+
+        item_section = Gio.Menu()
+        item_section.append("Rename", "sidebar.rename")
+        item_section.append("Delete Folder", "sidebar.trash")
+        item_section.append("Reveal in File Manager", "sidebar.reveal")
+        menu.append_section(None, item_section)
+
+        new_section = Gio.Menu()
+        new_section.append("New Document", "sidebar.new-file")
+        new_section.append("New Folder", "sidebar.new-dir")
+        menu.append_section(None, new_section)
+
+        misc_section = Gio.Menu()
+        if is_folder:
+            misc_section.append("Copy Path", "sidebar.copy-path")
+        misc_section.append("Refresh", "sidebar.refresh")
+        menu.append_section(None, misc_section)
+
+        return menu
 
     def _on_right_click(self, gesture, _n_press, x, y):
         row = self._listbox.get_row_at_y(int(y))
@@ -271,6 +290,11 @@ class Sidebar(Gtk.Box):
         self._rename_action.set_enabled(is_folder)
         self._trash_action.set_enabled(is_folder)
         self._reveal_action.set_enabled(is_folder)
+        self._copy_path_action.set_enabled(is_folder)
+        self._pin_action.set_enabled(is_folder)
+
+        is_pinned = is_folder and self._settings.is_folder_pinned(self._context_path)
+        self._popover.set_menu_model(self._build_menu(is_folder, is_pinned))
 
         rect = Gdk.Rectangle()
         rect.x = int(x)
@@ -288,6 +312,21 @@ class Sidebar(Gtk.Box):
         gfile = Gio.File.new_for_path(self._context_path)
         launcher = Gtk.FileLauncher.new(gfile)
         launcher.open_containing_folder(self.get_root(), None, None)
+
+    # ---- Copy path ------------------------------------------------------
+
+    def _on_copy_path_activate(self, *_args):
+        if not self._context_path:
+            return
+        Gdk.Display.get_default().get_clipboard().set(self._context_path)
+
+    # ---- Pin ------------------------------------------------------------
+
+    def _on_pin_activate(self, *_args):
+        if not self._context_path:
+            return
+        self._settings.toggle_folder_pin(self._context_path)
+        self.refresh()
 
     # ---- Trash ----------------------------------------------------------
 
@@ -500,6 +539,7 @@ class Sidebar(Gtk.Box):
     # ---- Public ---------------------------------------------------------
 
     def refresh(self):
+        self._settings.cleanup_stale_pins()
         self._populate()
         self.emit("changed")
 

@@ -1,6 +1,6 @@
 # MarkLite
 
-A lightweight GTK4 Markdown reader and editor.
+Your markdown librarian. A lightweight GTK4 Markdown reader and editor.
 
 > **Alpha software.** Still tightening the screws..
 
@@ -77,5 +77,5 @@ MIT
 
 ## Disclaimer
 
-This project was developed with AI assistance. The code has been analysed with Codacy and Bandit. Use at your own discretion.
+This project was developed with AI assistance. The code has been analysed with Codacy and Bandit. Use at your own discretion.  
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/2256d98bf65c4dccac37123e0d824d8f)](https://app.codacy.com/gh/mkay/marklite/dashboard)

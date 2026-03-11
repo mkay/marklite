@@ -209,11 +209,14 @@ class DocumentPanel(Gtk.Box):
         self._scrolled.set_visible(True)
         self._empty.set_visible(False)
 
-        # Subfolder rows
+        # Subfolder rows — pinned folders first
         if subdirs:
             folder_listbox = self._make_listbox()
-            for spath, sname in subdirs:
-                folder_listbox.append(self._make_folder_row(spath, sname))
+            pinned_subdirs = [(p, n) for p, n in subdirs if self._settings.is_folder_pinned(p)]
+            unpinned_subdirs = [(p, n) for p, n in subdirs if not self._settings.is_folder_pinned(p)]
+            for spath, sname in pinned_subdirs + unpinned_subdirs:
+                pinned = self._settings.is_folder_pinned(spath)
+                folder_listbox.append(self._make_folder_row(spath, sname, pinned=pinned))
             self._content_box.append(folder_listbox)
 
         # Document rows
@@ -235,7 +238,7 @@ class DocumentPanel(Gtk.Box):
                 listbox.append(self._make_document_row(path))
             self._content_box.append(listbox)
 
-    def _make_folder_row(self, dir_path, name):
+    def _make_folder_row(self, dir_path, name, pinned=False):
         box = Gtk.Box(
             orientation=Gtk.Orientation.HORIZONTAL,
             spacing=8,
@@ -245,7 +248,8 @@ class DocumentPanel(Gtk.Box):
             margin_bottom=10,
         )
 
-        icon = Gtk.Image(icon_name="marklite-folder-symbolic")
+        icon_name = "marklite-pin-symbolic" if pinned else "marklite-folder-symbolic"
+        icon = Gtk.Image(icon_name=icon_name)
         icon.set_valign(Gtk.Align.START)
 
         info_box = Gtk.Box(
@@ -385,10 +389,16 @@ class DocumentPanel(Gtk.Box):
         box.append(info_box)
 
         if self._settings.is_pinned(path):
+            pin_btn = Gtk.Button()
+            pin_btn.add_css_class("flat")
+            pin_btn.add_css_class("circular")
+            pin_btn.set_valign(Gtk.Align.CENTER)
+            pin_btn.set_tooltip_text("Remove pin")
             pin_icon = Gtk.Image.new_from_icon_name("marklite-pin-symbolic")
             pin_icon.add_css_class("dim-label")
-            pin_icon.set_valign(Gtk.Align.CENTER)
-            box.append(pin_icon)
+            pin_btn.set_child(pin_icon)
+            pin_btn.connect("clicked", self._on_pin_icon_clicked, path)
+            box.append(pin_btn)
 
         row = Gtk.ListBoxRow(child=box)
         row._file_path = path
@@ -477,6 +487,14 @@ class DocumentPanel(Gtk.Box):
         reveal_folder_action.connect("activate", self._on_reveal_folder_activate)
         group.add_action(reveal_folder_action)
 
+        toggle_folder_pin_action = Gio.SimpleAction.new("toggle-folder-pin", None)
+        toggle_folder_pin_action.connect("activate", self._on_toggle_folder_pin_activate)
+        group.add_action(toggle_folder_pin_action)
+
+        copy_folder_path_action = Gio.SimpleAction.new("copy-folder-path", None)
+        copy_folder_path_action.connect("activate", self._on_copy_folder_path_activate)
+        group.add_action(copy_folder_path_action)
+
         self._folder_popover = Gtk.PopoverMenu()
         self._folder_popover.set_parent(self)
         self._folder_popover.set_has_arrow(False)
@@ -492,12 +510,18 @@ class DocumentPanel(Gtk.Box):
 
         menu = Gio.Menu()
         menu.append("Create new Document here", "docpane.new-document")
+        menu.append("Refresh", "docpane.refresh")
         self._pane_popover.set_menu_model(menu)
 
         new_doc_action = Gio.SimpleAction.new("new-document", None)
         new_doc_action.connect("activate", self._on_new_document_activate)
         group = Gio.SimpleActionGroup()
         group.add_action(new_doc_action)
+
+        pane_refresh_action = Gio.SimpleAction.new("refresh", None)
+        pane_refresh_action.connect("activate", lambda *_: self.refresh())
+        group.add_action(pane_refresh_action)
+
         self.insert_action_group("docpane", group)
 
         gesture = Gtk.GestureClick(button=Gdk.BUTTON_SECONDARY)
@@ -562,12 +586,25 @@ class DocumentPanel(Gtk.Box):
         self.refresh()
 
     def _build_folder_context_menu(self):
-        section = Gio.Menu()
-        section.append("Rename", "docpanel.rename-folder")
-        section.append("Delete Folder", "docpanel.delete-folder")
-        section.append("Reveal in File Manager", "docpanel.reveal-folder")
+        is_pinned = (
+            self._settings.is_folder_pinned(self._context_folder_path)
+            if self._context_folder_path else False
+        )
+        pin_section = Gio.Menu()
+        pin_section.append("Unpin" if is_pinned else "Pin to Top", "docpanel.toggle-folder-pin")
+
+        action_section = Gio.Menu()
+        action_section.append("Rename", "docpanel.rename-folder")
+        action_section.append("Delete Folder", "docpanel.delete-folder")
+        action_section.append("Reveal in File Manager", "docpanel.reveal-folder")
+
+        path_section = Gio.Menu()
+        path_section.append("Copy Path", "docpanel.copy-folder-path")
+
         menu = Gio.Menu()
-        menu.append_section(None, section)
+        menu.append_section(None, pin_section)
+        menu.append_section(None, action_section)
+        menu.append_section(None, path_section)
         return menu
 
     def _on_folder_row_right_click(self, gesture, _n_press, x, y, row):
@@ -680,6 +717,17 @@ class DocumentPanel(Gtk.Box):
         launcher = Gtk.FileLauncher.new(gfile)
         launcher.open_containing_folder(self.get_root(), None, None)
 
+    def _on_toggle_folder_pin_activate(self, *_args):
+        if not self._context_folder_path:
+            return
+        self._settings.toggle_folder_pin(self._context_folder_path)
+        self.refresh()
+
+    def _on_copy_folder_path_activate(self, *_args):
+        if not self._context_folder_path:
+            return
+        Gdk.Display.get_default().get_clipboard().set(self._context_folder_path)
+
     def _on_row_right_click(self, gesture, _n_press, x, y, row):
         self._context_path = row._file_path
 
@@ -707,6 +755,10 @@ class DocumentPanel(Gtk.Box):
         if not self._context_path:
             return
         self._settings.toggle_pin(self._context_path)
+        self.refresh()
+
+    def _on_pin_icon_clicked(self, _btn, path):
+        self._settings.toggle_pin(path)
         self.refresh()
 
     def _on_open_with_activate(self, *_args):
