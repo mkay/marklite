@@ -409,6 +409,9 @@ class Sidebar(Gtk.Box):
             return
         new_path = os.path.join(os.path.dirname(old_path), new_name)
         if os.path.exists(new_path):
+            win = self.get_root()
+            if hasattr(win, "show_toast"):
+                win.show_toast(f"\u201c{new_name}\u201d already exists", "warning")
             return
         try:
             os.rename(old_path, new_path)
@@ -495,6 +498,9 @@ class Sidebar(Gtk.Box):
         )
         path = os.path.join(parent_dir, name)
         if os.path.exists(path):
+            win = self.get_root()
+            if hasattr(win, "show_toast"):
+                win.show_toast(f"\u201c{name}\u201d already exists", "warning")
             return
         try:
             with open(path, "w", encoding="utf-8") as f:
@@ -529,6 +535,9 @@ class Sidebar(Gtk.Box):
             return
         path = os.path.join(parent_dir, name)
         if os.path.exists(path):
+            win = self.get_root()
+            if hasattr(win, "show_toast"):
+                win.show_toast(f"\u201c{name}\u201d already exists", "warning")
             return
         try:
             os.makedirs(path)

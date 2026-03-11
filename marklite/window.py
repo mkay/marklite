@@ -227,7 +227,20 @@ class MainWindow(Adw.ApplicationWindow):
         self._split_view.set_sidebar(sidebar_toolbar)
         self._split_view.set_content(content_toolbar)
 
-        self.set_content(self._split_view)
+        self._toast_overlay = Adw.ToastOverlay()
+        self._toast_overlay.set_child(self._split_view)
+        self.set_content(self._toast_overlay)
+
+        _toast_css = Gtk.CssProvider()
+        _toast_css.load_from_string("""
+            .toast-error-icon   { color: @error_color;   }
+            .toast-success-icon { color: @success_color; }
+            .toast-warning-icon { color: @warning_color; }
+        """)
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(), _toast_css,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+        )
 
     def _connect_signals(self):
         self._sidebar_btn.connect("clicked", self._on_sidebar_toggled)
@@ -733,6 +746,25 @@ class MainWindow(Adw.ApplicationWindow):
                 f"document.querySelectorAll('h1,h2,h3,h4,h5,h6')[{idx}]?.scrollIntoView({{behavior:'smooth'}});",
                 -1, None, None, None, None,
             )
+
+    def show_toast(self, message, kind="info", timeout=3):
+        _icons = {
+            "error": ("dialog-error-symbolic", "toast-error-icon"),
+            "success": ("emblem-ok-symbolic", "toast-success-icon"),
+            "warning": ("dialog-warning-symbolic", "toast-warning-icon"),
+        }
+        toast = Adw.Toast(timeout=timeout)
+        if kind in _icons:
+            icon_name, css_class = _icons[kind]
+            box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL,
+                          spacing=8, valign=Gtk.Align.CENTER)
+            box.append(Gtk.Image(icon_name=icon_name, pixel_size=16,
+                                 css_classes=[css_class]))
+            box.append(Gtk.Label(label=message))
+            toast.set_custom_title(box)
+        else:
+            toast.set_title(message)
+        self._toast_overlay.add_toast(toast)
 
     def _on_close_request(self, _win):
         if self._settings.get("remember_last_folder"):

@@ -577,6 +577,9 @@ class DocumentPanel(Gtk.Box):
             name += ".md"
         path = os.path.join(parent_dir, name)
         if os.path.exists(path):
+            win = self.get_root()
+            if hasattr(win, "show_toast"):
+                win.show_toast(f"\u201c{name}\u201d already exists", "warning")
             return
         try:
             with open(path, "w", encoding="utf-8") as f:
@@ -703,6 +706,9 @@ class DocumentPanel(Gtk.Box):
             return
         new_path = os.path.join(os.path.dirname(old_path), new_name)
         if os.path.exists(new_path):
+            win = self.get_root()
+            if hasattr(win, "show_toast"):
+                win.show_toast(f"\u201c{new_name}\u201d already exists", "warning")
             return
         try:
             os.rename(old_path, new_path)
@@ -909,6 +915,9 @@ class DocumentPanel(Gtk.Box):
             return
         new_path = os.path.join(dest_dir, os.path.basename(old_path))
         if os.path.exists(new_path):
+            win = self.get_root()
+            if hasattr(win, "show_toast"):
+                win.show_toast("A file with that name already exists in the destination folder", "warning")
             return
         try:
             os.rename(old_path, new_path)
@@ -954,6 +963,9 @@ class DocumentPanel(Gtk.Box):
             return
         new_path = os.path.join(os.path.dirname(old_path), new_name)
         if os.path.exists(new_path):
+            win = self.get_root()
+            if hasattr(win, "show_toast"):
+                win.show_toast(f"\u201c{new_name}\u201d already exists", "warning")
             return
         try:
             os.rename(old_path, new_path)

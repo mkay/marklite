@@ -69,7 +69,7 @@ Settings are stored in `~/.config/marklite/settings.json` and can be changed fro
 
 ## License
 
-MIT
+MIT (Make It Terrific)
 
 ## Screenshots
 

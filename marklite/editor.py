@@ -5,7 +5,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("WebKit", "6.0")
-from gi.repository import Adw, GLib, Gtk, WebKit
+from gi.repository import Adw, Gdk, GLib, Gtk, WebKit
 
 
 _EDITOR_HTML = os.path.join(
@@ -39,6 +39,15 @@ class MarkdownEditor(Gtk.Box):
 
         ws = self._webview.get_settings()
         ws.set_enable_developer_extras(False)
+
+        # Workaround: WebKit GTK may swallow backtick (dead_grave)
+        # key events before they reach CodeMirror.  Intercept at
+        # the GTK level and inject via JS.
+        self._dead_key = None
+        key_ctl = Gtk.EventControllerKey()
+        key_ctl.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        key_ctl.connect("key-pressed", self._on_key_pressed)
+        self._webview.add_controller(key_ctl)
 
         self.prepend(self._build_toolbar())
         self.append(self._webview)
@@ -136,6 +145,59 @@ class MarkdownEditor(Gtk.Box):
             return
         if self._scroll_callback:
             self._scroll_callback(line)
+
+    # Dead-key / backtick interception --------------------------------
+
+    _DEAD_KEY_MAP = {
+        Gdk.KEY_dead_grave: "`",
+        Gdk.KEY_dead_acute: "'",
+        Gdk.KEY_dead_circumflex: "^",
+        Gdk.KEY_dead_tilde: "~",
+        Gdk.KEY_dead_diaeresis: '"',
+    }
+
+    def _on_key_pressed(self, _ctl, keyval, _keycode, state):
+        mods = state & (
+            Gdk.ModifierType.CONTROL_MASK
+            | Gdk.ModifierType.ALT_MASK
+            | Gdk.ModifierType.META_MASK
+        )
+        # Direct backtick key (layouts where ` is not a dead key)
+        if keyval == Gdk.KEY_grave and not mods:
+            self._js(f"window.insertText({json.dumps('`')})")
+            return True
+        # Dead key press — remember it
+        if keyval in self._DEAD_KEY_MAP and not mods:
+            self._dead_key = keyval
+            return True
+        # Key after a dead key
+        if self._dead_key is not None:
+            dk = self._dead_key
+            self._dead_key = None
+            if keyval == Gdk.KEY_space:
+                # dead key + space → literal character
+                char = self._DEAD_KEY_MAP[dk]
+                self._js(f"window.insertText({json.dumps(char)})")
+                return True
+            # dead key + letter → composed character (e.g. è, ñ)
+            composed = Gdk.keyval_to_unicode(keyval)
+            if composed:
+                letter = chr(composed)
+                import unicodedata
+                accent_map = {
+                    Gdk.KEY_dead_grave: "\u0300",
+                    Gdk.KEY_dead_acute: "\u0301",
+                    Gdk.KEY_dead_circumflex: "\u0302",
+                    Gdk.KEY_dead_tilde: "\u0303",
+                    Gdk.KEY_dead_diaeresis: "\u0308",
+                }
+                combining = accent_map.get(dk)
+                if combining:
+                    result = unicodedata.normalize("NFC", letter + combining)
+                    self._js(f"window.insertText({json.dumps(result)})")
+                    return True
+            return False
+        return False
 
     def _on_dark_changed(self, *_):
         self.update_style()
