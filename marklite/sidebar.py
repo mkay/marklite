@@ -54,6 +54,7 @@ class Sidebar(Gtk.Box):
     __gsignals__ = {
         "folder-selected": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
         "changed": (GObject.SignalFlags.RUN_FIRST, None, ()),
+        "file-created": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
     }
 
     # Special sentinels
@@ -96,8 +97,8 @@ class Sidebar(Gtk.Box):
         )
         new_dir_btn.connect("clicked", lambda _b: self._new_directory(self._settings.root_directory))
 
-        action_bar.append(new_file_btn)
         action_bar.append(new_dir_btn)
+        action_bar.append(new_file_btn)
         self.append(action_bar)
 
         self._setup_context_menu()
@@ -508,6 +509,7 @@ class Sidebar(Gtk.Box):
         except OSError:
             return
         self.refresh()
+        self.emit("file-created", path)
 
     def _new_directory(self, parent_dir):
         dialog = Adw.AlertDialog(

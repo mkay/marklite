@@ -248,6 +248,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._edit_btn.connect("toggled", self._on_edit_toggled)
         self._sidebar.connect("folder-selected", self._on_folder_selected)
         self._sidebar.connect("changed", lambda _s: self._doc_panel.refresh())
+        self._sidebar.connect("file-created", self._on_file_created)
         self._doc_panel.connect("file-selected", self._on_file_selected)
         self._doc_panel.connect("file-trashed", self._on_file_trashed)
         self._doc_panel.connect("file-renamed", self._on_file_renamed)
@@ -429,6 +430,20 @@ class MainWindow(Adw.ApplicationWindow):
         elif page == "documents" and self._doc_panel.is_drilled_in:
             self._doc_panel.navigate_back()
         self._update_back_btn()
+
+    def _on_file_created(self, _sidebar, path):
+        if self._editing:
+            text = self._editor.get_text()
+            try:
+                with open(self._current_file, "w", encoding="utf-8") as f:
+                    f.write(text)
+            except OSError:
+                pass
+            self._editing = False
+            self._edit_btn.set_active(False)
+            self._preview_btn.set_visible(False)
+        self._load_file(path)
+        self._edit_btn.set_active(True)
 
     def _on_file_selected(self, _panel, path):
         if self._editing:
