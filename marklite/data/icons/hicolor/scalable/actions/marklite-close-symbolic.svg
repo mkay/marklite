@@ -1,10 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" version="1.1">
-  <defs>
-    <style id="current-color-scheme" type="text/css">
-      .ColorScheme-Text { color:#444444; }
-    </style>
-  </defs>
-  <!-- X shape -->
-  <path style="fill:currentColor" class="ColorScheme-Text"
-        d="M 4,3 L 8,7 L 12,3 L 13,4 L 9,8 L 13,12 L 12,13 L 8,9 L 4,13 L 3,12 L 7,8 L 3,4 Z"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg"   fill="currentColor" viewBox="0 0 256 256"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"></path></svg>

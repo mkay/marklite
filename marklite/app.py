@@ -3,9 +3,9 @@ from pathlib import Path
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gdk, Gtk, Gio
+from gi.repository import Adw, Gdk, GLib, Gtk, Gio
 
-from marklite import APP_ID
+from marklite import APP_ID, APP_NAME, VERSION
 from marklite.settings_manager import SettingsManager
 
 
@@ -16,6 +16,18 @@ class Application(Adw.Application):
             flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
         )
         self.settings = SettingsManager()
+
+        self.set_option_context_parameter_string("[FOLDER]")
+        self.set_option_context_summary(
+            "Open a folder of Markdown files for reading and editing.\n"
+            "If FOLDER is given, it is used as the root directory for this session only."
+        )
+
+        self.add_main_option(
+            "version", ord("v"),
+            GLib.OptionFlags.NONE, GLib.OptionArg.NONE,
+            "Show the application version", None,
+        )
 
     def do_startup(self):
         Adw.Application.do_startup(self)
@@ -79,11 +91,17 @@ class Application(Adw.Application):
             self._apply_theme()
 
     def do_command_line(self, command_line):
+        options = command_line.get_options_dict()
+        if options.lookup_value("version"):
+            print(f"{APP_NAME} {VERSION}")
+            return 0
+
         args = command_line.get_arguments()[1:]
         if args:
             path = Path(args[0]).expanduser().resolve()
             if path.is_dir():
                 self.settings.set_override("root_directory", str(path))
+                self.settings.cli_root = True
         self.do_activate()
         return 0
 

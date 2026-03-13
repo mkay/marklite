@@ -34,5 +34,6 @@
     <file alias="marklite-heading-1-symbolic.svg">icons/hicolor/scalable/actions/marklite-heading-1-symbolic.svg</file>
     <file alias="marklite-heading-2-symbolic.svg">icons/hicolor/scalable/actions/marklite-heading-2-symbolic.svg</file>
     <file alias="marklite-heading-3-symbolic.svg">icons/hicolor/scalable/actions/marklite-heading-3-symbolic.svg</file>
+    <file alias="marklite-toc-symbolic.svg">icons/hicolor/scalable/actions/marklite-toc-symbolic.svg</file>
   </gresource>
 </gresources>

@@ -1,3 +1,3 @@
 APP_ID = "de.singular.marklite"
 APP_NAME = "MarkLite"
-VERSION = "0.1.3"
+VERSION = "0.3.2"

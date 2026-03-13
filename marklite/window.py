@@ -28,7 +28,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.set_title(APP_NAME)
 
         # Restore last navigated folder if the feature is enabled
-        if settings.get("remember_last_folder"):
+        # (but not if a CLI path override is already set)
+        if "root_directory" not in settings._overrides and settings.get("remember_last_folder"):
             last = settings.get("last_root_folder")
             if last and os.path.isdir(last):
                 settings.set_override("root_directory", last)
@@ -155,7 +156,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Table of contents popover (visible when a file is open)
         self._toc_btn = Gtk.MenuButton(
-            icon_name="marklite-list-bullet-symbolic",
+            icon_name="marklite-toc-symbolic",
             tooltip_text="Table of contents",
             visible=False,
         )
@@ -782,7 +783,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._toast_overlay.add_toast(toast)
 
     def _on_close_request(self, _win):
-        if self._settings.get("remember_last_folder"):
+        if self._settings.get("remember_last_folder") and not getattr(self._settings, "cli_root", False):
             self._settings.set("last_root_folder", self._settings.root_directory)
         return False
 
