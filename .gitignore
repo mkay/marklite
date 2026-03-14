@@ -2,6 +2,8 @@ builddir/
 pkg/
 src/
 *.pkg.tar.zst
+*.tar.gz
+.SRCINFO
 *.deb
 deb-staging/
 __pycache__/

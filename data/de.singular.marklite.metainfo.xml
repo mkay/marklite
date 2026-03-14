@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>de.singular.marklite</id>
+
+  <name>MarkLite</name>
+  <summary>A lightweight Markdown reader and editor</summary>
+
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+
+  <description>
+    <p>
+      MarkLite is a lightweight GTK4 Markdown reader and editor built with
+      libadwaita. It features a split-pane editor with live preview, syntax
+      highlighting, table of contents navigation, and a folder-based document
+      browser.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Live preview with synchronized scrolling</li>
+      <li>CodeMirror 6 editor with Markdown syntax highlighting</li>
+      <li>Folder-based document sidebar with pinning support</li>
+      <li>Code block syntax highlighting with copy button</li>
+      <li>Interactive task list checkboxes</li>
+      <li>Table of contents navigation</li>
+      <li>Light and dark theme support</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">de.singular.marklite.desktop</launchable>
+
+  <url type="homepage">https://github.com/mkay/marklite</url>
+  <url type="bugtracker">https://github.com/mkay/marklite/issues</url>
+  <url type="vcs-browser">https://github.com/mkay/marklite</url>
+
+  <developer id="de.singular">
+    <name>Kreuder</name>
+  </developer>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#99c1f1</color>
+    <color type="primary" scheme_preference="dark">#1a5fb4</color>
+  </branding>
+
+  <content_rating type="oars-1.1" />
+
+  <releases>
+    <release version="0.3.3" date="2026-03-14">
+      <description>
+        <p>Switched to Phosphor Icons, fixed opening directories via CLI argument.</p>
+      </description>
+    </release>
+    <release version="0.3.2" date="2026-03-12">
+      <description>
+        <p>Better new document behaviour, minor UI improvements.</p>
+      </description>
+    </release>
+    <release version="0.3.0" date="2026-03-11">
+      <description>
+        <p>Added pin-to-top for folders, various fixes and cleanup.</p>
+      </description>
+    </release>
+  </releases>
+
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+</component>
