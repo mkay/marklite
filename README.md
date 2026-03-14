@@ -61,8 +61,6 @@ sudo meson install -C builddir
 ```bash
 marklite                    # opens the configured root directory
 marklite ~/Cloud/Notes/     # opens a specific directory (session only)
-marklite --help             # show available options
-marklite --version          # print version and exit
 ```
 
 ## Configuration
@@ -71,7 +69,7 @@ Settings are stored in `~/.config/marklite/settings.json` and can be changed fro
 
 ## License
 
-MIT (Make It Terrific)
+MIT
 
 ## Credits
 

@@ -733,6 +733,9 @@ class DocumentPanel(Gtk.Box):
         if not self._context_folder_path:
             return
         Gdk.Display.get_default().get_clipboard().set(self._context_folder_path)
+        win = self.get_root()
+        if hasattr(win, "show_toast"):
+            win.show_toast("Path copied to clipboard", "success")
 
     def _on_row_right_click(self, gesture, _n_press, x, y, row):
         self._context_path = row._file_path
@@ -845,6 +848,9 @@ class DocumentPanel(Gtk.Box):
         if not self._context_path:
             return
         Gdk.Display.get_default().get_clipboard().set(self._context_path)
+        win = self.get_root()
+        if hasattr(win, "show_toast"):
+            win.show_toast("Path copied to clipboard", "success")
 
     def _on_trash_activate(self, *_args):
         if not self._context_path:

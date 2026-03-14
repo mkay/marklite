@@ -3,7 +3,7 @@ import os
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gtk, Gio, GObject, Gdk
+from gi.repository import Adw, Gtk, Gio, GObject, Gdk, Graphene
 
 
 def _count_md_files(dir_path):
@@ -203,7 +203,7 @@ class Sidebar(Gtk.Box):
 
     def _setup_context_menu(self):
         self._popover = Gtk.PopoverMenu()
-        self._popover.set_parent(self._listbox)
+        self._popover.set_parent(self)
         self._popover.set_has_arrow(False)
 
         group = Gio.SimpleActionGroup()
@@ -245,7 +245,7 @@ class Sidebar(Gtk.Box):
         group.add_action(pin_action)
         self._pin_action = pin_action
 
-        self._listbox.insert_action_group("sidebar", group)
+        self.insert_action_group("sidebar", group)
 
         gesture = Gtk.GestureClick(button=Gdk.BUTTON_SECONDARY)
         gesture.connect("pressed", self._on_right_click)
@@ -297,9 +297,20 @@ class Sidebar(Gtk.Box):
         is_pinned = is_folder and self._settings.is_folder_pinned(self._context_path)
         self._popover.set_menu_model(self._build_menu(is_folder, is_pinned))
 
+        # Compute position relative to self (popover parent) so the
+        # popover is not constrained to the listbox allocation.
+        src_point = Graphene.Point()
+        src_point.x = x
+        src_point.y = y
+        success, dest_point = self._listbox.compute_point(self, src_point)
+        if success:
+            px, py = dest_point.x, dest_point.y
+        else:
+            px, py = x, y
+
         rect = Gdk.Rectangle()
-        rect.x = int(x)
-        rect.y = int(y)
+        rect.x = int(px)
+        rect.y = int(py)
         rect.width = 1
         rect.height = 1
         self._popover.set_pointing_to(rect)
@@ -320,6 +331,9 @@ class Sidebar(Gtk.Box):
         if not self._context_path:
             return
         Gdk.Display.get_default().get_clipboard().set(self._context_path)
+        win = self.get_root()
+        if hasattr(win, "show_toast"):
+            win.show_toast("Path copied to clipboard", "success")
 
     # ---- Pin ------------------------------------------------------------
 

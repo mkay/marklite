@@ -691,6 +691,7 @@ class MainWindow(Adw.ApplicationWindow):
         ]
         clipboard = Gdk.Display.get_default().get_clipboard()
         clipboard.set_content(Gdk.ContentProvider.new_union(providers))
+        self.show_toast("Copied as rich text", "success")
 
     def _update_stats(self, text):
         words = len(text.split())
