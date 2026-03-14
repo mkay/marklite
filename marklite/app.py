@@ -43,6 +43,11 @@ class Application(Adw.Application):
         self.add_action(new_window)
         self.set_accels_for_action("app.new-window", ["<Control><Shift>n"])
 
+        quit_action = Gio.SimpleAction.new("quit", None)
+        quit_action.connect("activate", lambda *_: self.quit())
+        self.add_action(quit_action)
+        self.set_accels_for_action("app.quit", ["<Control>q"])
+
         window_size = Gio.SimpleAction.new("window-size", None)
         window_size.connect("activate", self._on_window_size)
         self.add_action(window_size)
