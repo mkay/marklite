@@ -5,8 +5,8 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, GLib, Gtk, Gio
 
-from marklite import APP_ID, APP_NAME, VERSION
-from marklite.settings_manager import SettingsManager
+from stenmark import APP_ID, APP_NAME, VERSION
+from stenmark.settings_manager import SettingsManager
 
 
 class Application(Adw.Application):
@@ -54,8 +54,8 @@ class Application(Adw.Application):
 
     def _register_icons(self):
         pkg_dir = Path(__file__).parent
-        gresource = pkg_dir / "data" / "de.singular.marklite.gresource"
-        gresource_xml = pkg_dir / "data" / "de.singular.marklite.gresource.xml"
+        gresource = pkg_dir / "data" / "de.singular.stenmark.gresource"
+        gresource_xml = pkg_dir / "data" / "de.singular.stenmark.gresource.xml"
         if not gresource.exists() and gresource_xml.exists():
             # Dev mode: compile the gresource on the fly
             import subprocess  # nosec B404
@@ -70,7 +70,7 @@ class Application(Adw.Application):
             Gio.resources_register(Gio.resource_load(str(gresource)))
             Gtk.IconTheme.get_for_display(
                 Gdk.Display.get_default()
-            ).add_resource_path("/de/singular/marklite/icons/hicolor")
+            ).add_resource_path("/de/singular/stenmark/icons/hicolor")
 
     def _load_css(self):
         css = Gtk.CssProvider()
@@ -113,12 +113,12 @@ class Application(Adw.Application):
     def do_activate(self):
         win = self.get_active_window()
         if not win:
-            from marklite.window import MainWindow
+            from stenmark.window import MainWindow
             win = MainWindow(application=self, settings=self.settings)
         win.present()
 
     def _on_new_window(self, _action, _param):
-        from marklite.window import MainWindow
+        from stenmark.window import MainWindow
         win = MainWindow(application=self, settings=self.settings)
         win.present()
 

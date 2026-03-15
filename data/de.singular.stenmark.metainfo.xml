@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>de.singular.marklite</id>
+  <id>de.singular.stenmark</id>
 
-  <name>MarkLite</name>
+  <name>Stenmark</name>
   <summary>A lightweight Markdown reader and editor</summary>
 
   <metadata_license>MIT</metadata_license>
@@ -10,7 +10,7 @@
 
   <description>
     <p>
-      MarkLite is a lightweight GTK4 Markdown reader and editor built with
+      Stenmark is a lightweight GTK4 Markdown reader and editor built with
       libadwaita. It features a split-pane editor with live preview, syntax
       highlighting, table of contents navigation, and a folder-based document
       browser.
@@ -27,11 +27,11 @@
     </ul>
   </description>
 
-  <launchable type="desktop-id">de.singular.marklite.desktop</launchable>
+  <launchable type="desktop-id">de.singular.stenmark.desktop</launchable>
 
-  <url type="homepage">https://github.com/mkay/marklite</url>
-  <url type="bugtracker">https://github.com/mkay/marklite/issues</url>
-  <url type="vcs-browser">https://github.com/mkay/marklite</url>
+  <url type="homepage">https://github.com/mkay/stenmark</url>
+  <url type="bugtracker">https://github.com/mkay/stenmark/issues</url>
+  <url type="vcs-browser">https://github.com/mkay/stenmark</url>
 
   <developer id="de.singular">
     <name>Kreuder</name>

@@ -1,17 +1,17 @@
-# MarkLite
+# Stenmark
 
 Your markdown librarian. A lightweight GTK4 Markdown reader and editor.
 
 > **Alpha software.** Still tightening the screws..
 
-![MarkLite Icon](data/de.singular.marklite.svg)
+![Stenmark Icon](data/de.singular.stenmark.svg)
 
 ## Features
 
 - Folder sidebar with document panel — browse and manage markdown files
 - Subfolder navigation — drill into nested folders from the document panel
 - Root folder switcher — quickly change scope via the sidebar header
-- Open a directory from the command line: `marklite ~/path/to/notes/`
+- Open a directory from the command line: `stenmark ~/path/to/notes/`
 - WebKit-based rendered markdown view with syntax highlighting
 - CodeMirror 6 editor with live preview pane and scroll sync
 - Dark mode — follows system theme
@@ -45,7 +45,7 @@ makepkg -sic
 ### Debian / Ubuntu
 
 ```bash
-sudo apt install ./marklite_*.deb
+sudo apt install ./stenmark_*.deb
 ```
 
 ### From source
@@ -59,13 +59,13 @@ sudo meson install -C builddir
 ## Usage
 
 ```bash
-marklite                    # opens the configured root directory
-marklite ~/Cloud/Notes/     # opens a specific directory (session only)
+stenmark                    # opens the configured root directory
+stenmark ~/Documents/Notes/     # opens a specific directory (session only)
 ```
 
 ## Configuration
 
-Settings are stored in `~/.config/marklite/settings.json` and can be changed from the Preferences dialog. All changes take effect immediately.
+Settings are stored in `~/.config/stenmark/settings.json` and can be changed from the Preferences dialog. All changes take effect immediately.
 
 ## License
 
@@ -73,15 +73,15 @@ MIT
 
 ## Credits
 
-MarkLite uses [Phosphor Icons](https://phosphoricons.com/) (MIT)
+Stenmark uses [Phosphor Icons](https://phosphoricons.com/) (MIT)
 
 ## Screenshots
 
-![View screen](assets/marklite_view.png)
+![View screen](assets/stenmark_view.png)
 
-![Editor screen](assets/marklite_edit.png)
+![Editor screen](assets/stenmark_edit.png)
 
 ## Disclaimer
 
 This project was developed with AI assistance. The code has been analysed with Codacy and Bandit. Use at your own discretion.  
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/2256d98bf65c4dccac37123e0d824d8f)](https://app.codacy.com/gh/mkay/marklite/dashboard)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/2256d98bf65c4dccac37123e0d824d8f)](https://app.codacy.com/gh/mkay/stenmark/dashboard)

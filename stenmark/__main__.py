@@ -1,5 +1,5 @@
 import sys
-from marklite.app import Application
+from stenmark.app import Application
 
 def main():
     app = Application()

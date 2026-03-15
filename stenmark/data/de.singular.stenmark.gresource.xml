@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/de/singular/stenmark/icons/hicolor/scalable/actions">
+<file alias="stenmark-open-menu-symbolic.svg">icons/hicolor/scalable/actions/stenmark-open-menu-symbolic.svg</file>
+    <file alias="stenmark-edit-symbolic.svg">icons/hicolor/scalable/actions/stenmark-edit-symbolic.svg</file>
+    <file alias="stenmark-document-new-symbolic.svg">icons/hicolor/scalable/actions/stenmark-document-new-symbolic.svg</file>
+    <file alias="stenmark-folder-symbolic.svg">icons/hicolor/scalable/actions/stenmark-folder-symbolic.svg</file>
+    <file alias="stenmark-folder-new-symbolic.svg">icons/hicolor/scalable/actions/stenmark-folder-new-symbolic.svg</file>
+    <file alias="stenmark-folder-striped-symbolic.svg">icons/hicolor/scalable/actions/stenmark-folder-striped-symbolic.svg</file>
+    <file alias="stenmark-file-markdown-symbolic.svg">icons/hicolor/scalable/actions/stenmark-file-markdown-symbolic.svg</file>
+    <file alias="stenmark-go-previous-symbolic.svg">icons/hicolor/scalable/actions/stenmark-go-previous-symbolic.svg</file>
+    <file alias="stenmark-go-up-symbolic.svg">icons/hicolor/scalable/actions/stenmark-go-up-symbolic.svg</file>
+    <file alias="stenmark-go-down-symbolic.svg">icons/hicolor/scalable/actions/stenmark-go-down-symbolic.svg</file>
+    <file alias="stenmark-close-symbolic.svg">icons/hicolor/scalable/actions/stenmark-close-symbolic.svg</file>
+    <file alias="stenmark-document-all-symbolic.svg">icons/hicolor/scalable/actions/stenmark-document-all-symbolic.svg</file>
+    <file alias="stenmark-sidebar-show-symbolic.svg">icons/hicolor/scalable/actions/stenmark-sidebar-show-symbolic.svg</file>
+    <file alias="stenmark-sidebar-hide-symbolic.svg">icons/hicolor/scalable/actions/stenmark-sidebar-hide-symbolic.svg</file>
+    <file alias="stenmark-search-symbolic.svg">icons/hicolor/scalable/actions/stenmark-search-symbolic.svg</file>
+    <file alias="stenmark-preview-symbolic.svg">icons/hicolor/scalable/actions/stenmark-preview-symbolic.svg</file>
+    <file alias="stenmark-preview-off-symbolic.svg">icons/hicolor/scalable/actions/stenmark-preview-off-symbolic.svg</file>
+    <file alias="stenmark-format-code-symbolic.svg">icons/hicolor/scalable/actions/stenmark-format-code-symbolic.svg</file>
+    <file alias="stenmark-format-code-block-symbolic.svg">icons/hicolor/scalable/actions/stenmark-format-code-block-symbolic.svg</file>
+    <file alias="stenmark-format-quote-symbolic.svg">icons/hicolor/scalable/actions/stenmark-format-quote-symbolic.svg</file>
+    <file alias="stenmark-pin-symbolic.svg">icons/hicolor/scalable/actions/stenmark-pin-symbolic.svg</file>
+    <file alias="stenmark-export-pdf-symbolic.svg">icons/hicolor/scalable/actions/stenmark-export-pdf-symbolic.svg</file>
+    <file alias="stenmark-open-with-symbolic.svg">icons/hicolor/scalable/actions/stenmark-open-with-symbolic.svg</file>
+    <file alias="stenmark-copy-rich-text-symbolic.svg">icons/hicolor/scalable/actions/stenmark-copy-rich-text-symbolic.svg</file>
+    <file alias="stenmark-format-bold-symbolic.svg">icons/hicolor/scalable/actions/stenmark-format-bold-symbolic.svg</file>
+    <file alias="stenmark-format-italic-symbolic.svg">icons/hicolor/scalable/actions/stenmark-format-italic-symbolic.svg</file>
+    <file alias="stenmark-format-strikethrough-symbolic.svg">icons/hicolor/scalable/actions/stenmark-format-strikethrough-symbolic.svg</file>
+    <file alias="stenmark-insert-link-symbolic.svg">icons/hicolor/scalable/actions/stenmark-insert-link-symbolic.svg</file>
+    <file alias="stenmark-list-bullet-symbolic.svg">icons/hicolor/scalable/actions/stenmark-list-bullet-symbolic.svg</file>
+    <file alias="stenmark-list-ordered-symbolic.svg">icons/hicolor/scalable/actions/stenmark-list-ordered-symbolic.svg</file>
+    <file alias="stenmark-heading-1-symbolic.svg">icons/hicolor/scalable/actions/stenmark-heading-1-symbolic.svg</file>
+    <file alias="stenmark-heading-2-symbolic.svg">icons/hicolor/scalable/actions/stenmark-heading-2-symbolic.svg</file>
+    <file alias="stenmark-heading-3-symbolic.svg">icons/hicolor/scalable/actions/stenmark-heading-3-symbolic.svg</file>
+    <file alias="stenmark-toc-symbolic.svg">icons/hicolor/scalable/actions/stenmark-toc-symbolic.svg</file>
+  </gresource>
+</gresources>

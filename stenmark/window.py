@@ -6,12 +6,12 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, GLib, Gtk, Gio
 
-from marklite import APP_NAME, VERSION
-from marklite.sidebar import Sidebar
-from marklite.document_panel import DocumentPanel
-from marklite.viewer import MarkdownViewer
-from marklite.editor import MarkdownEditor
-from marklite.welcome import WelcomeView
+from stenmark import APP_NAME, VERSION
+from stenmark.sidebar import Sidebar
+from stenmark.document_panel import DocumentPanel
+from stenmark.viewer import MarkdownViewer
+from stenmark.editor import MarkdownEditor
+from stenmark.welcome import WelcomeView
 
 
 class MainWindow(Adw.ApplicationWindow):
@@ -75,7 +75,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Back button (start, leftmost)
         self._back_btn = Gtk.Button(
-            icon_name="marklite-go-previous-symbolic",
+            icon_name="stenmark-go-previous-symbolic",
             tooltip_text="Back",
             visible=False,
         )
@@ -84,7 +84,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Edit toggle (start)
         self._edit_btn = Gtk.ToggleButton(
-            icon_name="marklite-edit-symbolic",
+            icon_name="stenmark-edit-symbolic",
             tooltip_text="Toggle edit mode",
             sensitive=False,
         )
@@ -93,7 +93,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Preview toggle (only visible while editing)
         self._preview_btn = Gtk.ToggleButton(
-            icon_name="marklite-preview-symbolic",
+            icon_name="stenmark-preview-symbolic",
             tooltip_text="Toggle live preview",
             active=True,
             visible=False,
@@ -121,7 +121,7 @@ class MainWindow(Adw.ApplicationWindow):
         about_section.append("About", "win.about")
         menu.append_section(None, about_section)
         menu_btn = Gtk.MenuButton(
-            icon_name="marklite-open-menu-symbolic",
+            icon_name="stenmark-open-menu-symbolic",
             menu_model=menu,
             tooltip_text="Menu",
         )
@@ -130,7 +130,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Sidebar toggle (left of menu button)
         self._sidebar_btn = Gtk.Button(
-            icon_name="marklite-sidebar-hide-symbolic",
+            icon_name="stenmark-sidebar-hide-symbolic",
             tooltip_text="Toggle sidebar",
         )
         self._sidebar_btn.set_focus_on_click(False)
@@ -138,7 +138,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Open In (visible when a file is open, disabled while editing)
         self._open_in_btn = Gtk.Button(
-            icon_name="marklite-open-with-symbolic",
+            icon_name="stenmark-open-with-symbolic",
             tooltip_text="Open in…",
             visible=False,
         )
@@ -147,7 +147,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Copy as rich text (visible when a file is open)
         self._copy_rich_btn = Gtk.Button(
-            icon_name="marklite-copy-rich-text-symbolic",
+            icon_name="stenmark-copy-rich-text-symbolic",
             tooltip_text="Copy as rich text",
             visible=False,
         )
@@ -156,7 +156,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Table of contents popover (visible when a file is open)
         self._toc_btn = Gtk.MenuButton(
-            icon_name="marklite-toc-symbolic",
+            icon_name="stenmark-toc-symbolic",
             tooltip_text="Table of contents",
             visible=False,
         )
@@ -308,9 +308,9 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_split_sidebar_changed(self, split_view, _param):
         showing = split_view.get_show_sidebar()
         if showing:
-            self._sidebar_btn.set_icon_name("marklite-sidebar-hide-symbolic")
+            self._sidebar_btn.set_icon_name("stenmark-sidebar-hide-symbolic")
         else:
-            self._sidebar_btn.set_icon_name("marklite-sidebar-show-symbolic")
+            self._sidebar_btn.set_icon_name("stenmark-sidebar-show-symbolic")
         self._content_header.set_show_start_title_buttons(not showing)
 
     def _on_edit_toggled(self, btn):
@@ -362,7 +362,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._edit_btn.set_active(False)
             self._preview_btn.set_visible(False)
 
-        from marklite.sidebar import Sidebar
+        from stenmark.sidebar import Sidebar
         if folder_path == Sidebar.ALL_DOCUMENTS:
             self._title_widget.set_subtitle("All Documents")
         elif folder_path == Sidebar.NO_FOLDER:
@@ -418,7 +418,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._doc_panel.refresh()
             self._stack.set_visible_child_name("documents")
             # Restore subtitle to folder name
-            from marklite.sidebar import Sidebar
+            from stenmark.sidebar import Sidebar
             folder = self._doc_panel._current_folder
             if folder == Sidebar.ALL_DOCUMENTS:
                 self._title_widget.set_subtitle("All Documents")
@@ -509,7 +509,7 @@ class MainWindow(Adw.ApplicationWindow):
         if not self._settings.file_watching or not self._current_file:
             return
         try:
-            from marklite.file_watcher import FileWatcher
+            from stenmark.file_watcher import FileWatcher
             self._watcher = FileWatcher(self._current_file, self._on_file_changed)
         except Exception:  # nosec B110
             pass
@@ -573,7 +573,7 @@ class MainWindow(Adw.ApplicationWindow):
         active = btn.get_active()
         self._preview_viewer.set_visible(active)
         btn.set_icon_name(
-            "marklite-preview-symbolic" if active else "marklite-preview-off-symbolic"
+            "stenmark-preview-symbolic" if active else "stenmark-preview-off-symbolic"
         )
         if active:
             text = self._editor.get_text()
@@ -613,7 +613,7 @@ class MainWindow(Adw.ApplicationWindow):
         for mime in ("text/markdown", "text/plain"):
             for app in Gio.AppInfo.get_recommended_for_type(mime):
                 aid = app.get_id()
-                if aid and aid not in seen and "marklite" not in aid:
+                if aid and aid not in seen and "stenmark" not in aid:
                     apps.append(app)
                     seen.add(aid)
 
@@ -679,7 +679,7 @@ class MainWindow(Adw.ApplicationWindow):
         else:
             return
 
-        from marklite.markdown_renderer import MarkdownRenderer
+        from stenmark.markdown_renderer import MarkdownRenderer
         body = MarkdownRenderer().render(text)
         html = f"<html><body>{body}</body></html>"
 
@@ -789,16 +789,16 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _on_preferences(self, *_args):
-        from marklite.settings_dialog import SettingsDialog
+        from stenmark.settings_dialog import SettingsDialog
         dialog = SettingsDialog(self._settings)
         dialog.present(self)
 
     def _on_about(self, *_args):
         about = Adw.AboutDialog(
             application_name=APP_NAME,
-            application_icon="de.singular.marklite-symbolic",
+            application_icon="de.singular.stenmark-symbolic",
             version=VERSION,
-            developer_name="MarkLite",
+            developer_name="Stenmark",
             comments="A lightweight GTK4 Markdown reader and editor",
             license_type=Gtk.License.MIT_X11,
         )
@@ -815,7 +815,7 @@ class MainWindow(Adw.ApplicationWindow):
         if not btn.get_active():
             return
 
-        from marklite.sidebar import _collect_subdirs
+        from stenmark.sidebar import _collect_subdirs
 
         current_root = self._settings.root_directory
         ceiling = os.path.expanduser(self._root_ceiling)
@@ -841,7 +841,7 @@ class MainWindow(Adw.ApplicationWindow):
                 margin_top=4,
                 margin_bottom=4,
             )
-            back_box.append(Gtk.Image(icon_name="marklite-go-previous-symbolic"))
+            back_box.append(Gtk.Image(icon_name="stenmark-go-previous-symbolic"))
             back_box.append(Gtk.Label(
                 label=os.path.basename(parent) if parent != current_root else "Back",
                 xalign=0,
@@ -865,7 +865,7 @@ class MainWindow(Adw.ApplicationWindow):
                     margin_top=4,
                     margin_bottom=4,
                 )
-                row_box.append(Gtk.Image(icon_name="marklite-folder-symbolic"))
+                row_box.append(Gtk.Image(icon_name="stenmark-folder-symbolic"))
                 row_box.append(Gtk.Label(label=dir_name, xalign=0, hexpand=True))
                 btn.set_child(row_box)
                 btn.connect("clicked", self._on_root_nav, dir_path)

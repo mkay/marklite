@@ -6,7 +6,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gtk, Gio, GObject, Gdk, Graphene
 
-from marklite.sidebar import Sidebar, _count_md_files
+from stenmark.sidebar import Sidebar, _count_md_files
 
 
 def _collect_subdirs(root):
@@ -148,7 +148,7 @@ class DocumentPanel(Gtk.Box):
         self._empty = Adw.StatusPage(
             title="No Documents",
             description="This folder has no markdown files.",
-            icon_name="marklite-search-symbolic",
+            icon_name="stenmark-search-symbolic",
             vexpand=True,
         )
         self._empty.set_visible(False)
@@ -248,7 +248,7 @@ class DocumentPanel(Gtk.Box):
             margin_bottom=10,
         )
 
-        icon_name = "marklite-pin-symbolic" if pinned else "marklite-folder-symbolic"
+        icon_name = "stenmark-pin-symbolic" if pinned else "stenmark-folder-symbolic"
         icon = Gtk.Image(icon_name=icon_name)
         icon.set_valign(Gtk.Align.START)
 
@@ -394,7 +394,7 @@ class DocumentPanel(Gtk.Box):
             pin_btn.add_css_class("circular")
             pin_btn.set_valign(Gtk.Align.CENTER)
             pin_btn.set_tooltip_text("Remove pin")
-            pin_icon = Gtk.Image.new_from_icon_name("marklite-pin-symbolic")
+            pin_icon = Gtk.Image.new_from_icon_name("stenmark-pin-symbolic")
             pin_icon.add_css_class("dim-label")
             pin_btn.set_child(pin_icon)
             pin_btn.connect("clicked", self._on_pin_icon_clicked, path)
@@ -779,7 +779,7 @@ class DocumentPanel(Gtk.Box):
         for mime in ("text/markdown", "text/plain"):
             for app in Gio.AppInfo.get_recommended_for_type(mime):
                 aid = app.get_id()
-                if aid and aid not in seen and "marklite" not in aid:
+                if aid and aid not in seen and "stenmark" not in aid:
                     apps.append(app)
                     seen.add(aid)
 

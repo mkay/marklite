@@ -6,7 +6,7 @@ configure_file(
   install_dir: moduledir,
 )
 
-marklite_sources = [
+stenmark_sources = [
   '__main__.py',
   'app.py',
   'document_panel.py',
@@ -22,7 +22,7 @@ marklite_sources = [
   'window.py',
 ]
 
-install_data(marklite_sources, install_dir: moduledir)
+install_data(stenmark_sources, install_dir: moduledir)
 
 # App-specific icons — kept inside the package data dir
 install_subdir(
@@ -38,8 +38,8 @@ install_subdir(
 )
 
 gnome.compile_resources(
-  'de.singular.marklite',
-  'data/de.singular.marklite.gresource.xml',
+  'de.singular.stenmark',
+  'data/de.singular.stenmark.gresource.xml',
   source_dir: 'data',
   gresource_bundle: true,
   install: true,

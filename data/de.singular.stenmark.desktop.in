@@ -1,9 +1,9 @@
  [Desktop Entry]
 Type=Application
-Name=MarkLite
+Name=Stenmark
 Comment=A lightweight Markdown reader and editor
 Exec=@BIN@
-Icon=de.singular.marklite
+Icon=de.singular.stenmark
 Terminal=false
 Categories=Development;TextEditor;
 Keywords=markdown;editor;viewer;notes;

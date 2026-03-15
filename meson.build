@@ -1,4 +1,4 @@
-project('marklite',
+project('stenmark',
   version: '0.3.3',
   meson_version: '>= 0.62.0',
   default_options: ['warning_level=2'],
@@ -12,7 +12,7 @@ bindir = prefix / get_option('bindir')
 datadir = prefix / get_option('datadir')
 
 pkgdatadir = datadir / meson.project_name()
-moduledir = pkgdatadir / 'marklite'
+moduledir = pkgdatadir / 'stenmark'
 
 conf = configuration_data()
 conf.set('PYTHON', python.full_path())
@@ -21,7 +21,7 @@ conf.set('pkgdatadir', pkgdatadir)
 conf.set('BIN', bindir / meson.project_name())
 
 subdir('data')
-subdir('marklite')
+subdir('stenmark')
 subdir('bin')
 
 gnome.post_install(

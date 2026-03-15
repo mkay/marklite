@@ -84,14 +84,14 @@ class Sidebar(Gtk.Box):
         action_bar.add_css_class("toolbar")
 
         new_file_btn = Gtk.Button(
-            icon_name="marklite-document-new-symbolic",
+            icon_name="stenmark-document-new-symbolic",
             tooltip_text="New Document",
             hexpand=True,
         )
         new_file_btn.connect("clicked", lambda _b: self._new_file(self._active_dir()))
 
         new_dir_btn = Gtk.Button(
-            icon_name="marklite-folder-new-symbolic",
+            icon_name="stenmark-folder-new-symbolic",
             tooltip_text="New Folder",
             hexpand=True,
         )
@@ -127,7 +127,7 @@ class Sidebar(Gtk.Box):
         total = _count_md_files(root)
         row = self._make_row(
             "All Documents",
-            "marklite-document-all-symbolic",
+            "stenmark-document-all-symbolic",
             total,
             self.ALL_DOCUMENTS,
         )
@@ -137,7 +137,7 @@ class Sidebar(Gtk.Box):
         root_count = _count_root_md_files(root)
         row = self._make_row(
             "No Folder",
-            "marklite-folder-striped-symbolic",
+            "stenmark-folder-striped-symbolic",
             root_count,
             self.NO_FOLDER,
         )
@@ -149,7 +149,7 @@ class Sidebar(Gtk.Box):
         unpinned_dirs = [(p, n) for p, n in subdirs if not self._settings.is_folder_pinned(p)]
         for dir_path, dir_name in pinned_dirs + unpinned_dirs:
             count = _count_md_files(dir_path)
-            icon = "marklite-pin-symbolic" if self._settings.is_folder_pinned(dir_path) else "marklite-folder-symbolic"
+            icon = "stenmark-pin-symbolic" if self._settings.is_folder_pinned(dir_path) else "stenmark-folder-symbolic"
             row = self._make_row(dir_name, icon, count, dir_path)
             self._listbox.append(row)
 

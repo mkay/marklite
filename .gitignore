@@ -7,6 +7,6 @@ src/
 *.deb
 deb-staging/
 __pycache__/
-marklite/__init__.py
+stenmark/__init__.py
 node_modules/
 *.gresource

@@ -8,8 +8,8 @@ gi.require_version("Adw", "1")
 gi.require_version("WebKit", "6.0")
 from gi.repository import Adw, Gdk, Gtk, WebKit
 
-from marklite.markdown_renderer import MarkdownRenderer
-from marklite.html_template import wrap_html
+from stenmark.markdown_renderer import MarkdownRenderer
+from stenmark.html_template import wrap_html
 
 
 class MarkdownViewer(Gtk.Box):
@@ -53,15 +53,15 @@ class MarkdownViewer(Gtk.Box):
         self._search_entry.connect("activate", lambda *_: self._find_controller.search_next())
         box.append(self._search_entry)
 
-        prev_btn = Gtk.Button(icon_name="marklite-go-up-symbolic", tooltip_text="Previous match")
+        prev_btn = Gtk.Button(icon_name="stenmark-go-up-symbolic", tooltip_text="Previous match")
         prev_btn.connect("clicked", lambda *_: self._find_controller.search_previous())
         box.append(prev_btn)
 
-        next_btn = Gtk.Button(icon_name="marklite-go-down-symbolic", tooltip_text="Next match")
+        next_btn = Gtk.Button(icon_name="stenmark-go-down-symbolic", tooltip_text="Next match")
         next_btn.connect("clicked", lambda *_: self._find_controller.search_next())
         box.append(next_btn)
 
-        close_btn = Gtk.Button(icon_name="marklite-close-symbolic", tooltip_text="Close")
+        close_btn = Gtk.Button(icon_name="stenmark-close-symbolic", tooltip_text="Close")
         close_btn.connect("clicked", lambda *_: self.hide_search())
         box.append(close_btn)
 

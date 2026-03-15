@@ -1,6 +1,6 @@
 configure_file(
-  input: 'marklite.in',
-  output: 'marklite',
+  input: 'stenmark.in',
+  output: 'stenmark',
   configuration: conf,
   install: true,
   install_dir: get_option('bindir'),

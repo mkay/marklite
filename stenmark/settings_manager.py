@@ -27,7 +27,7 @@ DEFAULTS = {
     "window_height": 700,
 }
 
-CONFIG_DIR = Path.home() / ".config" / "marklite"
+CONFIG_DIR = Path.home() / ".config" / "stenmark"
 CONFIG_FILE = CONFIG_DIR / "settings.json"
 
 

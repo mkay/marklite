@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.backends._legacy:_Backend"
 
 [project]
-name = "marklite"
+name = "stenmark"
 version = "0.1.0"
 description = "A lightweight GTK4 Markdown reader and editor"
 requires-python = ">=3.10"
@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.scripts]
-marklite = "marklite.__main__:main"
+stenmark = "stenmark.__main__:main"
 
 [tool.setuptools.packages.find]
-include = ["marklite*"]
+include = ["stenmark*"]

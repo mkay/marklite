@@ -3,7 +3,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw
 
-from marklite import APP_NAME, VERSION
+from stenmark import APP_NAME, VERSION
 
 
 class WelcomeView(Adw.Bin):
@@ -13,9 +13,9 @@ class WelcomeView(Adw.Bin):
         super().__init__()
 
         status = Adw.StatusPage(
-            icon_name="de.singular.marklite-symbolic",
+            icon_name="de.singular.stenmark-symbolic",
             title=f"Welcome to {APP_NAME}",
-            description=f"Your Markdown Librarian\nVersion {VERSION}\n\nMarklite is alpha software\nFeatures may appear, disappear, or spontaneously improve.\n\nSelect a Markdown file from the sidebar.",  # nosec B608
+            description=f"Your Markdown Librarian\nVersion {VERSION}\n\nStenmark is alpha software\nFeatures may appear, disappear, or spontaneously improve.\n\nSelect a Markdown file from the sidebar.",  # nosec B608
             vexpand=True,
             hexpand=True,
         )
