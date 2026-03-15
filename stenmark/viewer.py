@@ -27,6 +27,25 @@ class MarkdownViewer(Gtk.Box):
         ucm.register_script_message_handler("checkboxToggled")
         ucm.connect("script-message-received::checkboxToggled", self._on_checkbox_toggled)
 
+        # Custom find highlight styles (JS-driven, not FindController)
+        find_css = WebKit.UserStyleSheet(
+            "mark.sf-match {"
+            "  background: rgba(255, 221, 0, 0.5);"
+            "  color: inherit;"
+            "  border-radius: 2px;"
+            "}"
+            "mark.sf-current {"
+            "  background: rgba(255, 106, 0, 0.35);"
+            "  color: inherit;"
+            "  border-radius: 2px;"
+            "}",
+            WebKit.UserContentInjectedFrames.ALL_FRAMES,
+            WebKit.UserStyleLevel.USER,
+            None,
+            None,
+        )
+        ucm.add_style_sheet(find_css)
+
         self._webview = WebKit.WebView(user_content_manager=ucm)
         self._webview.set_vexpand(True)
         self._webview.set_hexpand(True)
@@ -39,7 +58,8 @@ class MarkdownViewer(Gtk.Box):
         self._show_empty()
 
     def _build_search_bar(self):
-        self._find_controller = self._webview.get_find_controller()
+        self._find_match_count = 0
+        self._find_current = -1
 
         box = Gtk.Box(spacing=4)
         box.add_css_class("toolbar")
@@ -50,15 +70,19 @@ class MarkdownViewer(Gtk.Box):
 
         self._search_entry = Gtk.SearchEntry(hexpand=True, placeholder_text="Find in document")
         self._search_entry.connect("search-changed", self._on_search_changed)
-        self._search_entry.connect("activate", lambda *_: self._find_controller.search_next())
+        self._search_entry.connect("activate", lambda *_: self._find_next())
         box.append(self._search_entry)
 
+        self._match_label = Gtk.Label(css_classes=["dim-label", "caption"])
+        self._match_label.set_visible(False)
+        box.append(self._match_label)
+
         prev_btn = Gtk.Button(icon_name="stenmark-go-up-symbolic", tooltip_text="Previous match")
-        prev_btn.connect("clicked", lambda *_: self._find_controller.search_previous())
+        prev_btn.connect("clicked", lambda *_: self._find_prev())
         box.append(prev_btn)
 
         next_btn = Gtk.Button(icon_name="stenmark-go-down-symbolic", tooltip_text="Next match")
-        next_btn.connect("clicked", lambda *_: self._find_controller.search_next())
+        next_btn.connect("clicked", lambda *_: self._find_next())
         box.append(next_btn)
 
         close_btn = Gtk.Button(icon_name="stenmark-close-symbolic", tooltip_text="Close")
@@ -73,27 +97,129 @@ class MarkdownViewer(Gtk.Box):
         key_ctl.connect("key-pressed", self._on_search_key)
         self._search_entry.add_controller(key_ctl)
 
+    # ---- JS-driven find-in-page -----------------------------------------
+
+    _FIND_JS = """
+    (function() {
+      // Remove previous marks
+      document.querySelectorAll('mark.sf-match, mark.sf-current').forEach(m => {
+        const parent = m.parentNode;
+        while (m.firstChild) parent.insertBefore(m.firstChild, m);
+        parent.removeChild(m);
+        parent.normalize();
+      });
+
+      const query = %s;
+      if (!query) return JSON.stringify({count: 0, current: -1});
+
+      const marks = [];
+      const walker = document.createTreeWalker(
+        document.body, NodeFilter.SHOW_TEXT, null
+      );
+      const ranges = [];
+      const lower = query.toLowerCase();
+      while (walker.nextNode()) {
+        const node = walker.currentNode;
+        const text = node.textContent.toLowerCase();
+        let start = 0;
+        while (true) {
+          const idx = text.indexOf(lower, start);
+          if (idx === -1) break;
+          ranges.push({node, start: idx, end: idx + query.length});
+          start = idx + 1;
+        }
+      }
+
+      // Wrap in reverse order to preserve offsets
+      for (let i = ranges.length - 1; i >= 0; i--) {
+        const r = ranges[i];
+        const range = document.createRange();
+        range.setStart(r.node, r.start);
+        range.setEnd(r.node, r.end);
+        const mark = document.createElement('mark');
+        mark.className = 'sf-match';
+        range.surroundContents(mark);
+      }
+
+      const allMarks = document.querySelectorAll('mark.sf-match');
+      if (allMarks.length > 0) {
+        allMarks[0].classList.add('sf-current');
+        allMarks[0].scrollIntoView({block: 'center'});
+      }
+      return JSON.stringify({count: allMarks.length, current: allMarks.length > 0 ? 0 : -1});
+    })()
+    """
+
+    _NAV_JS = """
+    (function() {
+      const marks = document.querySelectorAll('mark.sf-match');
+      if (marks.length === 0) return JSON.stringify({count: 0, current: -1});
+      marks.forEach(m => m.classList.remove('sf-current'));
+      const idx = %d;
+      marks[idx].classList.add('sf-current');
+      marks[idx].scrollIntoView({block: 'center'});
+      return JSON.stringify({count: marks.length, current: idx});
+    })()
+    """
+
+    _CLEAR_JS = """
+    (function() {
+      document.querySelectorAll('mark.sf-match, mark.sf-current').forEach(m => {
+        const parent = m.parentNode;
+        while (m.firstChild) parent.insertBefore(m.firstChild, m);
+        parent.removeChild(m);
+        parent.normalize();
+      });
+    })()
+    """
+
+    def _js(self, script, callback=None):
+        self._webview.evaluate_javascript(script, -1, None, None, None,
+                                          callback or (lambda *_: None))
+
     def _on_search_changed(self, entry):
         text = entry.get_text()
         if text:
-            self._find_controller.search(
-                text,
-                WebKit.FindOptions.CASE_INSENSITIVE | WebKit.FindOptions.WRAP_AROUND,
-                0,
-            )
+            escaped = json.dumps(text)
+            self._js(self._FIND_JS % escaped, self._on_find_result)
         else:
-            self._find_controller.search_finish()
+            self._js(self._CLEAR_JS)
+            self._find_match_count = 0
+            self._find_current = -1
+            self._match_label.set_visible(False)
 
-    def _inject_find_css(self):
-        css = (
-            "::highlight(search) { background: #ffdd00 !important; color: #000 !important; }"
-            "::highlight(current) { background: #ff6a00 !important; color: #000 !important; }"
-        )
-        script = (
-            f"(function(){{ var s = document.createElement('style');"
-            f"s.textContent = '{css}'; document.head.appendChild(s); }})()"
-        )
-        self._webview.evaluate_javascript(script, -1, None, None, None, None)
+    def _on_find_result(self, webview, result):
+        try:
+            val = webview.evaluate_javascript_finish(result)
+            data = json.loads(val.to_string())
+            self._find_match_count = data["count"]
+            self._find_current = data["current"]
+        except Exception:
+            self._find_match_count = 0
+            self._find_current = -1
+        self._update_match_label()
+
+    def _find_next(self):
+        if self._find_match_count == 0:
+            return
+        self._find_current = (self._find_current + 1) % self._find_match_count
+        self._js(self._NAV_JS % self._find_current, self._on_find_result)
+
+    def _find_prev(self):
+        if self._find_match_count == 0:
+            return
+        self._find_current = (self._find_current - 1) % self._find_match_count
+        self._js(self._NAV_JS % self._find_current, self._on_find_result)
+
+    def _update_match_label(self):
+        if self._find_match_count > 0:
+            self._match_label.set_label(
+                f"{self._find_current + 1}/{self._find_match_count}"
+            )
+            self._match_label.set_visible(True)
+        else:
+            self._match_label.set_label("No matches")
+            self._match_label.set_visible(bool(self._search_entry.get_text()))
 
     def _on_search_key(self, _ctl, keyval, _keycode, _state):
         if keyval == Gdk.KEY_Escape:
@@ -110,8 +236,11 @@ class MarkdownViewer(Gtk.Box):
 
     def hide_search(self):
         self._search_bar.set_visible(False)
-        self._find_controller.search_finish()
         self._search_entry.set_text("")
+        self._js(self._CLEAR_JS)
+        self._find_match_count = 0
+        self._find_current = -1
+        self._match_label.set_visible(False)
 
     def _on_checkbox_toggled(self, _ucm, result):
         try:

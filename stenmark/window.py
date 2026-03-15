@@ -12,6 +12,7 @@ from stenmark.document_panel import DocumentPanel
 from stenmark.viewer import MarkdownViewer
 from stenmark.editor import MarkdownEditor
 from stenmark.welcome import WelcomeView
+from stenmark.search_panel import SearchPanel
 
 
 class MainWindow(Adw.ApplicationWindow):
@@ -189,6 +190,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._doc_panel = DocumentPanel(self._settings)
         self._stack.add_named(self._doc_panel, "documents")
 
+        self._search_panel = SearchPanel(self._settings)
+        self._stack.add_named(self._search_panel, "search")
+
         self._viewer = MarkdownViewer(self._settings)
         self._stack.add_named(self._viewer, "view")
 
@@ -254,6 +258,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._sidebar.connect("folder-selected", self._on_folder_selected)
         self._sidebar.connect("changed", lambda _s: self._doc_panel.refresh())
         self._sidebar.connect("file-created", self._on_file_created)
+        self._sidebar.connect("search-requested", lambda _s: self._on_search(None, None))
         self._doc_panel.connect("file-selected", self._on_file_selected)
         self._doc_panel.connect("file-trashed", self._on_file_trashed)
         self._doc_panel.connect("file-renamed", self._on_file_renamed)
@@ -262,6 +267,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._editor.set_save_callback(self._on_editor_save)
         self._editor.set_preview_callback(self._on_preview_text_changed)
         self._editor.set_scroll_callback(self._on_editor_scroll)
+        self._search_panel.connect("file-selected", self._on_file_selected)
+        self._search_panel.connect("close-requested", lambda _p: self._on_back_clicked(None))
         self._preview_btn.connect("toggled", self._on_preview_toggled)
         self._copy_rich_btn.connect("clicked", self._on_copy_rich_text)
         self._open_in_btn.connect("clicked", self._on_open_in)
@@ -285,6 +292,11 @@ class MainWindow(Adw.ApplicationWindow):
         self.add_action(edit_toggle)
         self._apply_edit_shortcut()
 
+        search = Gio.SimpleAction.new("search", None)
+        search.connect("activate", self._on_search)
+        self.add_action(search)
+        self.get_application().set_accels_for_action("win.search", ["<Control><Shift>f"])
+
         self._export_pdf_action = Gio.SimpleAction.new("export-pdf", None)
         self._export_pdf_action.set_enabled(False)
         self._export_pdf_action.connect("activate", self._on_export_pdf)
@@ -301,7 +313,10 @@ class MainWindow(Adw.ApplicationWindow):
             pass
 
     def _on_find(self, *_args):
-        if self._editing:
+        page = self._stack.get_visible_child_name()
+        if page == "documents":
+            self._doc_panel.toggle_filter()
+        elif self._editing:
             self._editor.toggle_search()
         else:
             self._viewer.toggle_search()
@@ -390,7 +405,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _update_back_btn(self):
         page = self._stack.get_visible_child_name()
-        if page in ("view", "edit"):
+        if page in ("view", "edit", "search"):
             self._back_btn.set_visible(True)
         elif page == "documents" and self._doc_panel.is_drilled_in:
             self._back_btn.set_visible(True)
@@ -421,20 +436,27 @@ class MainWindow(Adw.ApplicationWindow):
             self._status_bar.set_visible(False)
             self._doc_panel.refresh()
             self._stack.set_visible_child_name("documents")
-            # Restore subtitle to folder name
-            from stenmark.sidebar import Sidebar
-            folder = self._doc_panel._current_folder
-            if folder == Sidebar.ALL_DOCUMENTS:
-                self._title_widget.set_subtitle("All Documents")
-            elif folder == Sidebar.NO_FOLDER:
-                self._title_widget.set_subtitle("No Folder")
-            elif self._doc_panel.is_drilled_in:
-                self._title_widget.set_subtitle(os.path.basename(self._doc_panel._browsing_folder))
-            else:
-                self._title_widget.set_subtitle(os.path.basename(folder))
+            self._restore_folder_subtitle()
+        elif page == "search":
+            self._search_panel.clear()
+            self._doc_panel.refresh()
+            self._stack.set_visible_child_name("documents")
+            self._restore_folder_subtitle()
         elif page == "documents" and self._doc_panel.is_drilled_in:
             self._doc_panel.navigate_back()
         self._update_back_btn()
+
+    def _restore_folder_subtitle(self):
+        from stenmark.sidebar import Sidebar
+        folder = self._doc_panel._current_folder
+        if folder == Sidebar.ALL_DOCUMENTS:
+            self._title_widget.set_subtitle("All Documents")
+        elif folder == Sidebar.NO_FOLDER:
+            self._title_widget.set_subtitle("No Folder")
+        elif self._doc_panel.is_drilled_in:
+            self._title_widget.set_subtitle(os.path.basename(self._doc_panel._browsing_folder))
+        else:
+            self._title_widget.set_subtitle(os.path.basename(folder) if folder else "")
 
     def _on_file_created(self, _sidebar, path):
         if self._editing:
@@ -802,6 +824,33 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_new_file_from_welcome(self):
         """Trigger the sidebar's new-file dialog."""
         self._sidebar.activate_action("sidebar.new-file", None)
+
+    def _on_search(self, *_args):
+        """Switch to the full-text search panel."""
+        if self._editing:
+            text = self._editor.get_text()
+            try:
+                with open(self._current_file, "w", encoding="utf-8") as f:
+                    f.write(text)
+            except OSError:
+                pass
+            self._editing = False
+            self._edit_btn.set_active(False)
+            self._preview_btn.set_visible(False)
+        # Scope search to the currently selected folder
+        folder = self._doc_panel._current_folder
+        if folder:
+            self._search_panel.set_folder(folder)
+        self._title_widget.set_subtitle("Search")
+        self._edit_btn.set_sensitive(False)
+        self._copy_rich_btn.set_visible(False)
+        self._open_in_btn.set_visible(False)
+        self._export_pdf_action.set_enabled(False)
+        self._toc_btn.set_visible(False)
+        self._status_bar.set_visible(False)
+        self._stack.set_visible_child_name("search")
+        self._back_btn.set_visible(True)
+        self._search_panel.focus_search()
 
     def _on_preferences(self, *_args):
         from stenmark.settings_dialog import SettingsDialog

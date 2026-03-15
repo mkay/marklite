@@ -14,6 +14,7 @@ stenmark_sources = [
   'file_watcher.py',
   'html_template.py',
   'markdown_renderer.py',
+  'search_panel.py',
   'settings_dialog.py',
   'settings_manager.py',
   'sidebar.py',

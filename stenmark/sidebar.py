@@ -55,6 +55,7 @@ class Sidebar(Gtk.Box):
         "folder-selected": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
         "changed": (GObject.SignalFlags.RUN_FIRST, None, ()),
         "file-created": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
+        "search-requested": (GObject.SignalFlags.RUN_FIRST, None, ()),
     }
 
     # Special sentinels
@@ -97,8 +98,16 @@ class Sidebar(Gtk.Box):
         )
         new_dir_btn.connect("clicked", lambda _b: self._new_directory(self._settings.root_directory))
 
+        search_btn = Gtk.Button(
+            icon_name="system-search-symbolic",
+            tooltip_text="Search All Documents",
+            hexpand=True,
+        )
+        search_btn.connect("clicked", lambda _b: self.emit("search-requested"))
+
         action_bar.append(new_dir_btn)
         action_bar.append(new_file_btn)
+        action_bar.append(search_btn)
         self.append(action_bar)
 
         self._setup_context_menu()

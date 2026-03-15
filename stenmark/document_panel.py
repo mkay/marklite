@@ -4,7 +4,7 @@ import time
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gtk, Gio, GObject, Gdk, Graphene
+from gi.repository import Adw, Gtk, Gio, GObject, Gdk, GLib, Graphene
 
 from stenmark.sidebar import Sidebar, _count_md_files
 
@@ -125,6 +125,28 @@ class DocumentPanel(Gtk.Box):
         self._context_path = None
         self._context_folder_path = None
 
+        # Filter bar
+        self._filter_bar = Gtk.Box(
+            orientation=Gtk.Orientation.HORIZONTAL,
+            spacing=6,
+            margin_start=12,
+            margin_end=12,
+            margin_top=8,
+            margin_bottom=4,
+        )
+        self._filter_entry = Gtk.SearchEntry(
+            placeholder_text="Filter documents\u2026",
+            hexpand=True,
+        )
+        self._filter_entry.connect("search-changed", self._on_filter_changed)
+        key_ctl = Gtk.EventControllerKey()
+        key_ctl.connect("key-pressed", self._on_filter_key_pressed)
+        self._filter_entry.add_controller(key_ctl)
+        self._filter_bar.append(self._filter_entry)
+        self._filter_bar.set_visible(False)
+        self._filter_text = ""
+        self.append(self._filter_bar)
+
         # Main scrolled area
         self._scrolled = Gtk.ScrolledWindow(vexpand=True)
 
@@ -237,6 +259,7 @@ class DocumentPanel(Gtk.Box):
             for path in pinned + unpinned:
                 listbox.append(self._make_document_row(path))
             self._content_box.append(listbox)
+        self._apply_filter()
 
     def _make_folder_row(self, dir_path, name, pinned=False):
         box = Gtk.Box(
@@ -292,6 +315,7 @@ class DocumentPanel(Gtk.Box):
 
         row = Gtk.ListBoxRow(child=box)
         row._folder_path = dir_path
+        row._display_name = name.lower()
 
         gesture = Gtk.GestureClick(button=Gdk.BUTTON_SECONDARY)
         gesture.connect("pressed", self._on_folder_row_right_click, row)
@@ -332,6 +356,7 @@ class DocumentPanel(Gtk.Box):
             for path in pinned + unpinned:
                 listbox.append(self._make_document_row(path))
             self._content_box.append(listbox)
+        self._apply_filter()
 
     def _make_listbox(self):
         listbox = Gtk.ListBox(css_classes=["boxed-list"])
@@ -402,6 +427,7 @@ class DocumentPanel(Gtk.Box):
 
         row = Gtk.ListBoxRow(child=box)
         row._file_path = path
+        row._display_name = display_name.lower()
 
         # Right-click gesture per row
         gesture = Gtk.GestureClick(button=Gdk.BUTTON_SECONDARY)
@@ -409,6 +435,73 @@ class DocumentPanel(Gtk.Box):
         row.add_controller(gesture)
 
         return row
+
+    # ---- Quick filter ---------------------------------------------------
+
+    def toggle_filter(self):
+        if self._filter_bar.get_visible():
+            self.hide_filter()
+        else:
+            self._filter_bar.set_visible(True)
+            self._filter_entry.grab_focus()
+
+    def hide_filter(self):
+        self._filter_bar.set_visible(False)
+        self._filter_entry.set_text("")
+        self._filter_text = ""
+        self._apply_filter()
+
+    def _on_filter_changed(self, entry):
+        self._filter_text = entry.get_text().strip().lower()
+        self._apply_filter()
+
+    def _on_filter_key_pressed(self, _ctl, keyval, _keycode, _state):
+        if keyval == Gdk.KEY_Escape:
+            self.hide_filter()
+            return True
+        return False
+
+    def _apply_filter(self):
+        """Show/hide rows based on current filter text."""
+        query = self._filter_text
+        if not query:
+            # Show everything
+            child = self._content_box.get_first_child()
+            while child:
+                child.set_visible(True)
+                if isinstance(child, Gtk.ListBox):
+                    row = child.get_first_child()
+                    while row:
+                        row.set_visible(True)
+                        row = row.get_next_sibling()
+                child = child.get_next_sibling()
+            return
+
+        child = self._content_box.get_first_child()
+        while child:
+            if isinstance(child, Gtk.ListBox):
+                any_visible = False
+                row = child.get_first_child()
+                while row:
+                    name = getattr(row, "_display_name", "")
+                    basename = ""
+                    if hasattr(row, "_file_path"):
+                        basename = os.path.basename(row._file_path).lower()
+                    elif hasattr(row, "_folder_path"):
+                        basename = os.path.basename(row._folder_path).lower()
+                    visible = query in name or query in basename
+                    row.set_visible(visible)
+                    if visible:
+                        any_visible = True
+                    row = row.get_next_sibling()
+                child.set_visible(any_visible)
+                # Also hide the preceding header label if all rows are hidden
+                prev = child.get_prev_sibling()
+                if prev and isinstance(prev, Gtk.Label):
+                    prev.set_visible(any_visible)
+            child = child.get_next_sibling()
+
+    # ---- Row activation -------------------------------------------------
 
     def _on_row_activated(self, _listbox, row):
         if hasattr(row, "_folder_path"):
