@@ -179,7 +179,11 @@ class MainWindow(Adw.ApplicationWindow):
         self._stack = Gtk.Stack()
         self._stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
 
-        self._welcome = WelcomeView()
+        self._welcome = WelcomeView(
+            settings=self._settings,
+            on_set_root=self._on_set_root_from_welcome,
+            on_new_file=self._on_new_file_from_welcome,
+        )
         self._stack.add_named(self._welcome, "welcome")
 
         self._doc_panel = DocumentPanel(self._settings)
@@ -555,6 +559,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._update_root_label()
             self._sidebar.refresh()
             self._doc_panel.refresh()
+            self._welcome.refresh()
         elif key in ("font_family", "font_size", "viewer_theme"):
             self._viewer.update_style()
             self._preview_viewer.update_style()
@@ -787,6 +792,16 @@ class MainWindow(Adw.ApplicationWindow):
         if self._settings.get("remember_last_folder") and not getattr(self._settings, "cli_root", False):
             self._settings.set("last_root_folder", self._settings.root_directory)
         return False
+
+    def _on_set_root_from_welcome(self):
+        """Open preferences dialog so the user can set a root directory."""
+        from stenmark.settings_dialog import SettingsDialog
+        dialog = SettingsDialog(self._settings)
+        dialog.present(self)
+
+    def _on_new_file_from_welcome(self):
+        """Trigger the sidebar's new-file dialog."""
+        self._sidebar.activate_action("sidebar.new-file", None)
 
     def _on_preferences(self, *_args):
         from stenmark.settings_dialog import SettingsDialog
