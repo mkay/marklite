@@ -1,6 +1,6 @@
 # Stenmark
 
-Your markdown librarian. A lightweight GTK4 Markdown reader and editor.
+Your markdown librarian. A lightweight GTK4 Markdown organizer and editor.
 
 > **Alpha software.** Still tightening the screws..
 

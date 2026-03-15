@@ -870,8 +870,8 @@ class MainWindow(Adw.ApplicationWindow):
             application_name=APP_NAME,
             application_icon="de.singular.stenmark-symbolic",
             version=VERSION,
-            developer_name="Stenmark",
-            comments="A lightweight GTK4 Markdown reader and editor",
+            developer_name="Kreuder <mk@singular.de>",
+            website="https://github.com/mkay/stenmark",
             license_type=Gtk.License.MIT_X11,
         )
         about.present(self)

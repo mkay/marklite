@@ -99,7 +99,7 @@ class Sidebar(Gtk.Box):
         new_dir_btn.connect("clicked", lambda _b: self._new_directory(self._settings.root_directory))
 
         search_btn = Gtk.Button(
-            icon_name="system-search-symbolic",
+            icon_name="stenmark-system-search-symbolic",
             tooltip_text="Search All Documents",
             hexpand=True,
         )
