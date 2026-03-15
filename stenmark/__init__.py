@@ -1,3 +1,3 @@
 APP_ID = "de.singular.stenmark"
 APP_NAME = "Stenmark"
-VERSION = "0.4.1"
+VERSION = "0.4.2"
