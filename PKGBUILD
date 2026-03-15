@@ -15,6 +15,8 @@ depends=(
   'libadwaita'
   'webkitgtk-6.0'
 )
+conflicts=('marklite')
+replaces=('marklite')
 makedepends=(
   'meson'
 )
