@@ -1,6 +1,6 @@
 # Maintainer: Kreuder <mk@singular.de>
 pkgname=stenmark
-pkgver=0.3.3
+pkgver=0.4.0
 pkgrel=1
 pkgdesc='A lightweight GTK4 Markdown reader and editor'
 arch=('any')
