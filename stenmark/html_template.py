@@ -124,6 +124,7 @@ pre {{
     border-radius: 6px;
     overflow-x: auto;
     line-height: 1.4;
+    white-space: pre;
 }}
 .copy-btn {{
     position: absolute;
