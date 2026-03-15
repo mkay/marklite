@@ -96,10 +96,10 @@ class SearchPanel(Gtk.Box):
         elif folder == Sidebar.NO_FOLDER:
             self._scope_name = "Files without Folder"
         else:
-            self._scope_name = os.path.basename(folder)
-        self._entry.set_placeholder_text(f'Search in "{self._scope_name}"\u2026')
-        self._status.set_title(f'Search "{self._scope_name}"')
-        self._status.set_description(f"What are you looking for?")
+            self._scope_name = f"\u201c{os.path.basename(folder)}\u201d"
+        self._entry.set_placeholder_text(f"Search in {self._scope_name}\u2026")
+        self._status.set_title(f"Search {self._scope_name}")
+        self._status.set_description("What are you looking for?")
 
     def focus_search(self):
         self._entry.grab_focus()
