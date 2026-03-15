@@ -17,10 +17,13 @@ class Application(Adw.Application):
         )
         self.settings = SettingsManager()
 
-        self.set_option_context_parameter_string("[FOLDER]")
+        self._open_file = None  # path to a .md file passed on the CLI
+
+        self.set_option_context_parameter_string("[FOLDER | FILE.md]")
         self.set_option_context_summary(
             "Open a folder of Markdown files for reading and editing.\n"
-            "If FOLDER is given, it is used as the root directory for this session only."
+            "If FOLDER is given, it is used as the root directory for this session only.\n"
+            "If a .md file is given, it is opened directly in view mode."
         )
 
         self.add_main_option(
@@ -107,6 +110,11 @@ class Application(Adw.Application):
             if path.is_dir():
                 self.settings.set_override("root_directory", str(path))
                 self.settings.cli_root = True
+            elif path.is_file() and path.suffix.lower() == ".md":
+                self._open_file = str(path)
+                # Set root to the file's parent directory for this session
+                self.settings.set_override("root_directory", str(path.parent))
+                self.settings.cli_root = True
         self.do_activate()
         return 0
 
@@ -114,7 +122,13 @@ class Application(Adw.Application):
         win = self.get_active_window()
         if not win:
             from stenmark.window import MainWindow
-            win = MainWindow(application=self, settings=self.settings)
+            open_file = self._open_file
+            self._open_file = None
+            win = MainWindow(application=self, settings=self.settings,
+                             open_file=open_file)
+        elif self._open_file:
+            win.open_file(self._open_file)
+            self._open_file = None
         win.present()
 
     def _on_new_window(self, _action, _param):

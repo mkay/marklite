@@ -16,7 +16,7 @@ from stenmark.search_panel import SearchPanel
 
 
 class MainWindow(Adw.ApplicationWindow):
-    def __init__(self, application, settings):
+    def __init__(self, application, settings, open_file=None):
         super().__init__(application=application)
         self._settings = settings
         self._current_file = None
@@ -39,6 +39,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._connect_signals()
         self._setup_actions()
         self.connect("close-request", self._on_close_request)
+
+        if open_file:
+            self.open_file(open_file)
 
     def _build_ui(self):
         # === Sidebar ToolbarView ===
@@ -476,6 +479,11 @@ class MainWindow(Adw.ApplicationWindow):
         if self._editing:
             self._prompt_unsaved(path)
             return
+        self._load_file(path)
+
+    def open_file(self, path):
+        """Open a file directly in view mode with sidebar hidden."""
+        self._split_view.set_show_sidebar(False)
         self._load_file(path)
 
     def _load_file(self, path):

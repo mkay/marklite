@@ -11,7 +11,10 @@ Your markdown librarian. A lightweight GTK4 Markdown reader and editor.
 - Folder sidebar with document panel — browse and manage markdown files
 - Subfolder navigation — drill into nested folders from the document panel
 - Root folder switcher — quickly change scope via the sidebar header
-- Open a directory from the command line: `stenmark ~/path/to/notes/`
+- Open a file or directory from the command line: `stenmark ~/notes/` or `stenmark todo.md`
+- Full-text search across documents (`Ctrl+Shift+F`) — scoped to the selected folder
+- Quick filter on the document list (`Ctrl+F` on the documents page)
+- Find in document (`Ctrl+F` in viewer) with customizable highlight colors
 - WebKit-based rendered markdown view with syntax highlighting
 - CodeMirror 6 editor with live preview pane and scroll sync
 - Dark mode — follows system theme
@@ -22,6 +25,7 @@ Your markdown librarian. A lightweight GTK4 Markdown reader and editor.
 - Task list checkboxes — toggle directly in the rendered view
 - Table of contents popover — navigate headings, click to scroll
 - Export to PDF (via menu), open in external app, copy as rich text
+- Welcome screen with root directory setup prompt when no folder is configured
 - Remember last folder across sessions (optional, in Preferences)
 - Configurable keyboard shortcuts, fonts, and themes
 
@@ -59,8 +63,9 @@ sudo meson install -C builddir
 ## Usage
 
 ```bash
-stenmark                    # opens the configured root directory
+stenmark                        # opens the configured root directory
 stenmark ~/Documents/Notes/     # opens a specific directory (session only)
+stenmark ~/Notes/todo.md        # opens a file directly (sidebar hidden)
 ```
 
 ## Configuration
