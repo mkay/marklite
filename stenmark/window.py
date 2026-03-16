@@ -24,6 +24,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._watcher = None
         self._preview_timeout_id = None
         self._toc_headings = []
+        self._nav_history = []   # list of file paths
+        self._nav_index = -1     # current position in history
 
         self.set_default_size(settings.window_width, settings.window_height)
         self.set_title(APP_NAME)
@@ -243,6 +245,11 @@ class MainWindow(Adw.ApplicationWindow):
         self._toast_overlay.set_child(self._split_view)
         self.set_content(self._toast_overlay)
 
+        # Mouse back/forward buttons
+        mouse_ctl = Gtk.GestureClick(button=0)
+        mouse_ctl.connect("pressed", self._on_mouse_button)
+        self.add_controller(mouse_ctl)
+
         _toast_css = Gtk.CssProvider()
         _toast_css.load_from_string("""
             .toast-error-icon   { color: @error_color;   }
@@ -272,6 +279,10 @@ class MainWindow(Adw.ApplicationWindow):
         self._editor.set_scroll_callback(self._on_editor_scroll)
         self._search_panel.connect("file-selected", self._on_file_selected)
         self._search_panel.connect("close-requested", lambda _p: self._on_back_clicked(None))
+        self._viewer.connect("link-activated", self._on_viewer_link)
+        self._viewer.connect("navigate-back", lambda *_: self._navigate_back())
+        self._viewer.connect("navigate-forward", lambda *_: self._navigate_forward())
+        self._preview_viewer.connect("link-activated", self._on_viewer_link)
         self._preview_btn.connect("toggled", self._on_preview_toggled)
         self._copy_rich_btn.connect("clicked", self._on_copy_rich_text)
         self._open_in_btn.connect("clicked", self._on_open_in)
@@ -299,6 +310,16 @@ class MainWindow(Adw.ApplicationWindow):
         search.connect("activate", self._on_search)
         self.add_action(search)
         self.get_application().set_accels_for_action("win.search", ["<Control><Shift>f"])
+
+        nav_back = Gio.SimpleAction.new("nav-back", None)
+        nav_back.connect("activate", lambda *_: self._navigate_back())
+        self.add_action(nav_back)
+        self.get_application().set_accels_for_action("win.nav-back", ["<Alt>Left"])
+
+        nav_fwd = Gio.SimpleAction.new("nav-forward", None)
+        nav_fwd.connect("activate", lambda *_: self._navigate_forward())
+        self.add_action(nav_fwd)
+        self.get_application().set_accels_for_action("win.nav-forward", ["<Alt>Right"])
 
         self._export_pdf_action = Gio.SimpleAction.new("export-pdf", None)
         self._export_pdf_action.set_enabled(False)
@@ -479,14 +500,59 @@ class MainWindow(Adw.ApplicationWindow):
         if self._editing:
             self._prompt_unsaved(path)
             return
+        # Reset link navigation history when opening from the panel/search
+        self._nav_history = [path]
+        self._nav_index = 0
         self._load_file(path)
+
+    def _on_viewer_link(self, _viewer, path):
+        if self._editing:
+            self._prompt_unsaved(path)
+            return
+        self._load_file(path, push_history=True)
+
+    def _navigate_back(self):
+        if self._nav_index <= 0:
+            return
+        if self._editing:
+            return
+        self._nav_index -= 1
+        self._load_file(self._nav_history[self._nav_index], push_history=False)
+
+    def _navigate_forward(self):
+        if self._nav_index >= len(self._nav_history) - 1:
+            return
+        if self._editing:
+            return
+        self._nav_index += 1
+        self._load_file(self._nav_history[self._nav_index], push_history=False)
+
+    def _sync_nav_state(self):
+        self._viewer.set_nav_state(
+            self._nav_index > 0,
+            self._nav_index < len(self._nav_history) - 1,
+        )
+
+    def _on_mouse_button(self, gesture, _n_press, _x, _y):
+        button = gesture.get_current_button()
+        if button == 8:    # mouse back
+            self._navigate_back()
+            gesture.set_state(Gtk.EventSequenceState.CLAIMED)
+        elif button == 9:  # mouse forward
+            self._navigate_forward()
+            gesture.set_state(Gtk.EventSequenceState.CLAIMED)
 
     def open_file(self, path):
         """Open a file directly in view mode with sidebar hidden."""
         self._split_view.set_show_sidebar(False)
         self._load_file(path)
 
-    def _load_file(self, path):
+    def _load_file(self, path, push_history=False):
+        if push_history:
+            # Truncate forward history and append
+            self._nav_history = self._nav_history[:self._nav_index + 1]
+            self._nav_history.append(path)
+            self._nav_index = len(self._nav_history) - 1
         self._current_file = path
         self._back_btn.set_visible(True)
         self._edit_btn.set_sensitive(True)
@@ -505,6 +571,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._update_toc(text)
         except OSError:
             pass
+        self._sync_nav_state()
 
     def _prompt_unsaved(self, next_path):
         dialog = Adw.AlertDialog(

@@ -22,6 +22,8 @@ Your markdown librarian. A lightweight GTK4 Markdown organizer and editor.
 - Pin folders to top — pinned folders appear first in the sidebar and document panel with a pin icon
 - Pin documents to top — pinned documents float to the top of their folder; click the pin icon to unpin
 - File watching — auto-reloads on disk changes
+- Document linking — click relative markdown links (e.g. `[notes](../notes.md)`) to navigate between documents; external links open in the default browser
+- Link navigation history — go back/forward with Alt+Left/Right, mouse side buttons, or the right-click context menu
 - Task list checkboxes — toggle directly in the rendered view
 - Table of contents popover — navigate headings, click to scroll
 - Export to PDF (via menu), open in external app, copy as rich text

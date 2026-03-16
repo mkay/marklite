@@ -57,6 +57,8 @@ for remote in $(git remote); do
 done
 
 # 4. Build Arch package
+echo "==> Updating checksums"
+updpkgsums
 echo "==> Building Arch package"
 makepkg -sf --noconfirm
 ARCH_PKG=$(ls -t ./*.pkg.tar.zst 2>/dev/null | grep -v debug | head -1)
@@ -176,6 +178,21 @@ if [[ -n "$FORGEJO_URL" && -n "${FORGEJO_TOKEN:-}" ]]; then
         echo "$RELEASE_JSON"
     fi
 fi
+
+# 7. Push to AUR
+echo "==> Pushing to AUR"
+makepkg --printsrcinfo > .SRCINFO
+AUR_DIR=$(mktemp -d)
+git clone ssh://aur@aur.archlinux.org/"$PROJECT_NAME".git "$AUR_DIR"
+cp PKGBUILD .SRCINFO "$AUR_DIR"/
+cd "$AUR_DIR"
+git branch -m main master 2>/dev/null
+git add PKGBUILD .SRCINFO
+git commit -m "Update to $VERSION"
+git push -u origin master
+cd - >/dev/null
+rm -rf "$AUR_DIR"
+echo "==> AUR updated"
 
 echo ""
 echo "==> Done! Released $PROJECT_NAME $TAG"

@@ -6,18 +6,26 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("WebKit", "6.0")
-from gi.repository import Adw, Gdk, Gtk, WebKit
+from gi.repository import Adw, Gdk, Gio, GObject, Gtk, WebKit
 
 from stenmark.markdown_renderer import MarkdownRenderer
 from stenmark.html_template import wrap_html
 
 
 class MarkdownViewer(Gtk.Box):
+    __gsignals__ = {
+        "link-activated": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
+        "navigate-back": (GObject.SignalFlags.RUN_FIRST, None, ()),
+        "navigate-forward": (GObject.SignalFlags.RUN_FIRST, None, ()),
+    }
+
     def __init__(self, settings):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self._settings = settings
         self._renderer = MarkdownRenderer()
         self._current_path = None
+        self._can_go_back = False
+        self._can_go_forward = False
 
         self._skip_next_load = False
 
@@ -49,6 +57,8 @@ class MarkdownViewer(Gtk.Box):
         self._webview = WebKit.WebView(user_content_manager=ucm)
         self._webview.set_vexpand(True)
         self._webview.set_hexpand(True)
+        self._webview.connect("decide-policy", self._on_decide_policy)
+        self._webview.connect("context-menu", self._on_context_menu)
 
         ws = self._webview.get_settings()
         ws.set_enable_developer_extras(False)
@@ -275,6 +285,73 @@ class MarkdownViewer(Gtk.Box):
         text = result.to_string()
         clipboard = Gdk.Display.get_default().get_clipboard()
         clipboard.set(text)
+
+    def _on_decide_policy(self, _webview, decision, decision_type):
+        if decision_type != WebKit.PolicyDecisionType.NAVIGATION_ACTION:
+            return False
+
+        action = decision.get_navigation_action()
+        if action.get_navigation_type() != WebKit.NavigationType.LINK_CLICKED:
+            return False
+
+        request = action.get_request()
+        uri = request.get_uri()
+
+        # External links → open in default browser
+        if uri.startswith("http://") or uri.startswith("https://"):
+            decision.ignore()
+            Gio.AppInfo.launch_default_for_uri(uri, None)
+            return True
+
+        # Local file links
+        if uri.startswith("file://"):
+            from urllib.parse import unquote, urlparse
+            parsed = urlparse(uri)
+            path = unquote(parsed.path)
+
+            if path.lower().endswith(".md"):
+                decision.ignore()
+                if os.path.isfile(path):
+                    self.emit("link-activated", path)
+                return True
+
+        # Block all other navigation (don't leave the rendered page)
+        decision.ignore()
+        return True
+
+    def set_nav_state(self, can_back, can_forward):
+        self._can_go_back = can_back
+        self._can_go_forward = can_forward
+
+    def _on_context_menu(self, _webview, menu, _hit_result):
+        # Remove WebKit's built-in navigation items (Back, Forward, Stop, Reload)
+        # which don't work with load_html()
+        _remove = {
+            WebKit.ContextMenuAction.GO_BACK,
+            WebKit.ContextMenuAction.GO_FORWARD,
+            WebKit.ContextMenuAction.STOP,
+            WebKit.ContextMenuAction.RELOAD,
+        }
+        for item in list(menu.get_items()):
+            if item.get_stock_action() in _remove:
+                menu.remove(item)
+
+        # Add our own Back / Forward at the top
+        back_action = Gio.SimpleAction.new("ctx-back", None)
+        back_action.set_enabled(self._can_go_back)
+        back_action.connect("activate", lambda *_: self.emit("navigate-back"))
+
+        fwd_action = Gio.SimpleAction.new("ctx-forward", None)
+        fwd_action.set_enabled(self._can_go_forward)
+        fwd_action.connect("activate", lambda *_: self.emit("navigate-forward"))
+
+        back_item = WebKit.ContextMenuItem.new_from_gaction(back_action, "Back", None)
+        fwd_item = WebKit.ContextMenuItem.new_from_gaction(fwd_action, "Forward", None)
+
+        menu.prepend(WebKit.ContextMenuItem.new_separator())
+        menu.prepend(fwd_item)
+        menu.prepend(back_item)
+        return False
 
     def _is_dark(self):
         style = Adw.StyleManager.get_default()
