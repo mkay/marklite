@@ -21,7 +21,7 @@ makedepends=(
   'meson'
 )
 source=("$pkgname-$pkgver.tar.gz::https://github.com/mkay/stenmark/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('fed2a0f5d703a31fa58afff7cfcd48bb92c14fea5adda4eb371dc1f50c500d1f')
+sha256sums=('07c9f700410224e8b9ea34d719e4ddeedfc19000e88cdde367772b74e5086286')
 
 build() {
   arch-meson "$pkgname-$pkgver" build
