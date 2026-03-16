@@ -4,7 +4,7 @@ import time
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gtk, Gio, GObject, Gdk, GLib, Graphene
+from gi.repository import Adw, Gtk, Gio, GObject, Gdk, Graphene
 
 from stenmark.sidebar import Sidebar, _count_md_files
 
