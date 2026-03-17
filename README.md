@@ -12,6 +12,7 @@ Your markdown librarian. A lightweight GTK4 Markdown organizer and editor.
 - Subfolder navigation — drill into nested folders from the document panel
 - Root folder switcher — quickly change scope via the sidebar header
 - Open a file or directory from the command line: `stenmark ~/notes/` or `stenmark todo.md`
+- External file handling — opening a file outside the root folder shows a sidebar prompt to navigate back to the root
 - Full-text search across documents (`Ctrl+Shift+F`) — scoped to the selected folder
 - Quick filter on the document list (`Ctrl+F` on the documents page)
 - Find in document (`Ctrl+F` in viewer) with customizable highlight colors

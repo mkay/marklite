@@ -56,6 +56,7 @@ class Sidebar(Gtk.Box):
         "changed": (GObject.SignalFlags.RUN_FIRST, None, ()),
         "file-created": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
         "search-requested": (GObject.SignalFlags.RUN_FIRST, None, ()),
+        "open-root-requested": (GObject.SignalFlags.RUN_FIRST, None, ()),
     }
 
     # Special sentinels
@@ -78,6 +79,7 @@ class Sidebar(Gtk.Box):
         self._listbox.connect("row-activated", self._on_row_selected)
 
         scrolled.set_child(self._listbox)
+        self._scrolled = scrolled
         self.append(scrolled)
 
         # Bottom action bar
@@ -108,7 +110,26 @@ class Sidebar(Gtk.Box):
         action_bar.append(new_dir_btn)
         action_bar.append(new_file_btn)
         action_bar.append(search_btn)
+        self._action_bar = action_bar
         self.append(action_bar)
+
+        # Outside-root placeholder (shown when viewed file is not in root)
+        self._outside_box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL,
+            halign=Gtk.Align.CENTER,
+            valign=Gtk.Align.CENTER,
+            vexpand=True,
+            hexpand=True,
+            visible=False,
+        )
+        open_root_btn = Gtk.Button(
+            label="Open root folder",
+            css_classes=["suggested-action", "pill"],
+            halign=Gtk.Align.CENTER,
+        )
+        open_root_btn.connect("clicked", lambda _b: self.emit("open-root-requested"))
+        self._outside_box.append(open_root_btn)
+        self.append(self._outside_box)
 
         self._setup_context_menu()
         self._populate()
@@ -574,8 +595,19 @@ class Sidebar(Gtk.Box):
 
     def refresh(self):
         self._settings.cleanup_stale_pins()
+        self.set_outside_root(False)
         self._populate()
         self.emit("changed")
+
+    def set_outside_root(self, outside):
+        if outside:
+            self._scrolled.set_visible(False)
+            self._action_bar.set_visible(False)
+            self._outside_box.set_visible(True)
+        else:
+            self._outside_box.set_visible(False)
+            self._scrolled.set_visible(True)
+            self._action_bar.set_visible(True)
 
     def get_selected_folder(self):
         return self._selected_path

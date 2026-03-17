@@ -269,6 +269,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._sidebar.connect("changed", lambda _s: self._doc_panel.refresh())
         self._sidebar.connect("file-created", self._on_file_created)
         self._sidebar.connect("search-requested", lambda _s: self._on_search(None, None))
+        self._sidebar.connect("open-root-requested", self._on_open_root_requested)
         self._doc_panel.connect("file-selected", self._on_file_selected)
         self._doc_panel.connect("file-trashed", self._on_file_trashed)
         self._doc_panel.connect("file-renamed", self._on_file_renamed)
@@ -458,6 +459,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._export_pdf_action.set_enabled(False)
             self._toc_btn.set_visible(False)
             self._status_bar.set_visible(False)
+            self._sidebar.set_outside_root(False)
             self._doc_panel.refresh()
             self._stack.set_visible_child_name("documents")
             self._restore_folder_subtitle()
@@ -546,6 +548,12 @@ class MainWindow(Adw.ApplicationWindow):
         """Open a file directly in view mode with sidebar hidden."""
         self._split_view.set_show_sidebar(False)
         self._load_file(path)
+        # Show "Open root folder" in sidebar if file is outside the
+        # persistent root (ceiling), not the session override.
+        ceiling = os.path.realpath(os.path.expanduser(self._root_ceiling))
+        file_dir = os.path.realpath(os.path.dirname(path))
+        if file_dir != ceiling and not file_dir.startswith(ceiling + os.sep):
+            self._sidebar.set_outside_root(True)
 
     def _load_file(self, path, push_history=False):
         if push_history:
@@ -942,6 +950,13 @@ class MainWindow(Adw.ApplicationWindow):
             license_type=Gtk.License.MIT_X11,
         )
         about.present(self)
+
+    # ---- Open root folder (sidebar, file outside root) --------------------
+
+    def _on_open_root_requested(self, _sidebar):
+        ceiling = os.path.expanduser(self._root_ceiling)
+        self._settings.set_override("root_directory", ceiling)
+        self._split_view.set_show_sidebar(True)
 
     # ---- Root folder navigation (sidebar header) -------------------------
 
