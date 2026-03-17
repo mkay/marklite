@@ -2,9 +2,10 @@
 Type=Application
 Name=Stenmark
 Comment=A lightweight Markdown reader and editor
-Exec=@BIN@
+Exec=@BIN@ %f
 Icon=de.singular.stenmark
 Terminal=false
 Categories=Development;TextEditor;
 Keywords=markdown;editor;viewer;notes;
+MimeType=text/markdown;text/x-markdown;text/plain;
 StartupNotify=true
