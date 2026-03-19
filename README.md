@@ -13,8 +13,10 @@ Your markdown librarian. A lightweight GTK4 Markdown organizer and editor.
 - Root folder switcher — quickly change scope via the sidebar header
 - Open a file or directory from the command line: `stenmark ~/notes/` or `stenmark todo.md`
 - External file handling — opening a file outside the root folder shows a sidebar prompt to navigate back to the root
+- Frontmatter tags — add tags via YAML frontmatter (`tags: [a, b]`), edit with the tag popover in the header bar
+- Tag filter pane (`Ctrl+T`) — select tags to find matching documents (AND logic); clickable tag chips on document rows
 - Full-text search across documents (`Ctrl+Shift+F`) — scoped to the selected folder
-- Quick filter on the document list (`Ctrl+F` on the documents page)
+- Quick filter on the document list (`Ctrl+F` on the documents page) — also matches tags
 - Find in document (`Ctrl+F` in viewer) with customizable highlight colors
 - WebKit-based rendered markdown view with syntax highlighting
 - CodeMirror 6 editor with live preview pane and scroll sync
@@ -37,7 +39,7 @@ Your markdown librarian. A lightweight GTK4 Markdown organizer and editor.
 - Python 3.10+
 - GTK 4.0, libadwaita 1
 - WebKitGTK 6.0
-- python-markdown, Pygments
+- python-markdown, Pygments, PyYAML
 - Meson, Ninja (build)
 
 ## Install
@@ -45,7 +47,7 @@ Your markdown librarian. A lightweight GTK4 Markdown organizer and editor.
 ### Arch Linux
 
 ```bash
-pacman -S python python-gobject gtk4 libadwaita webkitgtk-6.0 python-markdown python-pygments meson ninja
+pacman -S python python-gobject gtk4 libadwaita webkitgtk-6.0 python-markdown python-pygments python-yaml meson ninja
 makepkg -sic
 ```
 
