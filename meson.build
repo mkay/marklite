@@ -1,5 +1,5 @@
 project('stenmark',
-  version: '0.4.5',
+  version: '0.5.0',
   meson_version: '>= 0.62.0',
   default_options: ['warning_level=2'],
 )
