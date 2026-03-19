@@ -53,6 +53,17 @@ class SettingsDialog(Adw.PreferencesDialog):
         )
         dir_group.add(remember_row)
 
+        sidebar_tags_row = Adw.SwitchRow(
+            title="Show Tags in Sidebar",
+            subtitle="Display tags section in the sidebar",
+        )
+        sidebar_tags_row.set_active(self._settings.get("show_sidebar_tags"))
+        sidebar_tags_row.connect(
+            "notify::active",
+            lambda row, _: self._settings.set("show_sidebar_tags", row.get_active()),
+        )
+        dir_group.add(sidebar_tags_row)
+
         general_page.add(dir_group)
 
         # Theme group

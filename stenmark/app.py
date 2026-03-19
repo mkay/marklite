@@ -77,9 +77,49 @@ class Application(Adw.Application):
 
     def _load_css(self):
         css = Gtk.CssProvider()
-        css.load_from_string(
-            ".app-sidebar { background-color: shade(@window_bg_color, 0.97); }"
-        )
+        css.load_from_string("""
+            .app-sidebar { background-color: shade(@window_bg_color, 0.97); }
+            .tag-chip {
+                background: alpha(@accent_color, 0.15);
+                border-radius: 9999px;
+                padding: 0 8px;
+                min-height: 20px;
+                font-size: 0.8em;
+            }
+            flowboxchild:has(.tag-chip) {
+                padding: 0;
+                margin: 0;
+            }
+            .tag-chip-link {
+                background: alpha(@accent_color, 0.12);
+                color: alpha(@accent_color, 0.85);
+                border-radius: 4px;
+                padding: 1px 6px;
+            }
+            .tag-chip-link:hover {
+                background: alpha(@accent_color, 0.22);
+                color: @accent_color;
+            }
+            .tag-filter-chip {
+                border-radius: 9999px;
+                padding: 2px 10px;
+                font-size: 0.85em;
+                min-height: 0;
+            }
+            .navigation-sidebar row.sidebar-divider,
+            .navigation-sidebar row.sidebar-divider:hover,
+            .navigation-sidebar row.sidebar-divider:focus,
+            .navigation-sidebar row.sidebar-divider:active {
+                background: none;
+                outline: none;
+                box-shadow: none;
+                min-height: 0;
+                padding: 0;
+            }
+            .tag-filter-chip:checked {
+                background: alpha(@accent_color, 0.25);
+            }
+        """)
         Gtk.StyleContext.add_provider_for_display(
             Gdk.Display.get_default(), css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )

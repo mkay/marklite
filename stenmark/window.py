@@ -13,6 +13,9 @@ from stenmark.viewer import MarkdownViewer
 from stenmark.editor import MarkdownEditor
 from stenmark.welcome import WelcomeView
 from stenmark.search_panel import SearchPanel
+from stenmark.tag_index import TagIndex
+from stenmark.tag_panel import TagPanel
+from stenmark.frontmatter import read_tags, update_tags
 
 
 class MainWindow(Adw.ApplicationWindow):
@@ -36,6 +39,8 @@ class MainWindow(Adw.ApplicationWindow):
             last = settings.get("last_root_folder")
             if last and os.path.isdir(last):
                 settings.set_override("root_directory", last)
+
+        self._tag_index = TagIndex(settings.root_directory)
 
         self._build_ui()
         self._connect_signals()
@@ -69,7 +74,7 @@ class MainWindow(Adw.ApplicationWindow):
         # The "ceiling" is the configured root from settings (ignoring session overrides)
         self._root_ceiling = self._settings._data.get("root_directory", self._settings.get("root_directory"))
 
-        self._sidebar = Sidebar(self._settings)
+        self._sidebar = Sidebar(self._settings, tag_index=self._tag_index)
 
         sidebar_toolbar = Adw.ToolbarView()
         sidebar_toolbar.add_css_class("app-sidebar")
@@ -160,6 +165,15 @@ class MainWindow(Adw.ApplicationWindow):
         self._copy_rich_btn.set_focus_on_click(False)
         self._content_header.pack_end(self._copy_rich_btn)
 
+        # Tags button (visible when a file is open)
+        self._tags_btn = Gtk.Button(
+            icon_name="stenmark-tag-symbolic",
+            tooltip_text="Edit tags",
+            visible=False,
+        )
+        self._tags_btn.set_focus_on_click(False)
+        self._content_header.pack_end(self._tags_btn)
+
         # Table of contents popover (visible when a file is open)
         self._toc_btn = Gtk.MenuButton(
             icon_name="stenmark-toc-symbolic",
@@ -192,11 +206,14 @@ class MainWindow(Adw.ApplicationWindow):
         )
         self._stack.add_named(self._welcome, "welcome")
 
-        self._doc_panel = DocumentPanel(self._settings)
+        self._doc_panel = DocumentPanel(self._settings, tag_index=self._tag_index)
         self._stack.add_named(self._doc_panel, "documents")
 
         self._search_panel = SearchPanel(self._settings)
         self._stack.add_named(self._search_panel, "search")
+
+        self._tag_panel = TagPanel(self._settings, self._tag_index)
+        self._stack.add_named(self._tag_panel, "tags")
 
         self._viewer = MarkdownViewer(self._settings)
         self._stack.add_named(self._viewer, "view")
@@ -269,17 +286,22 @@ class MainWindow(Adw.ApplicationWindow):
         self._sidebar.connect("changed", lambda _s: self._doc_panel.refresh())
         self._sidebar.connect("file-created", self._on_file_created)
         self._sidebar.connect("search-requested", lambda _s: self._on_search(None, None))
+        self._sidebar.connect("tag-filter-requested", lambda _s: self._on_tag_filter(None, None))
         self._sidebar.connect("open-root-requested", self._on_open_root_requested)
         self._doc_panel.connect("file-selected", self._on_file_selected)
         self._doc_panel.connect("file-trashed", self._on_file_trashed)
         self._doc_panel.connect("file-renamed", self._on_file_renamed)
         self._doc_panel.connect("folder-navigated", self._on_folder_navigated)
+        self._doc_panel.connect("tag-clicked", lambda _p, tag: self._open_tag_panel(tag))
         self._settings.connect("changed", self._on_settings_changed)
         self._editor.set_save_callback(self._on_editor_save)
         self._editor.set_preview_callback(self._on_preview_text_changed)
         self._editor.set_scroll_callback(self._on_editor_scroll)
         self._search_panel.connect("file-selected", self._on_file_selected)
         self._search_panel.connect("close-requested", lambda _p: self._on_back_clicked(None))
+        self._search_panel.connect("tag-filter-requested", lambda _p: self._open_tag_panel())
+        self._tag_panel.connect("file-selected", self._on_file_selected)
+        self._tag_panel.connect("close-requested", lambda _p: self._on_back_clicked(None))
         self._viewer.connect("link-activated", self._on_viewer_link)
         self._viewer.connect("navigate-back", lambda *_: self._navigate_back())
         self._viewer.connect("navigate-forward", lambda *_: self._navigate_forward())
@@ -287,6 +309,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._preview_btn.connect("toggled", self._on_preview_toggled)
         self._copy_rich_btn.connect("clicked", self._on_copy_rich_text)
         self._open_in_btn.connect("clicked", self._on_open_in)
+        self._tags_btn.connect("clicked", self._on_tags_clicked)
 
     def _setup_actions(self):
         prefs = Gio.SimpleAction.new("preferences", None)
@@ -312,6 +335,11 @@ class MainWindow(Adw.ApplicationWindow):
         self.add_action(search)
         self.get_application().set_accels_for_action("win.search", ["<Control><Shift>f"])
 
+        tag_filter = Gio.SimpleAction.new("tag-filter", None)
+        tag_filter.connect("activate", self._on_tag_filter)
+        self.add_action(tag_filter)
+        self.get_application().set_accels_for_action("win.tag-filter", ["<Control>t"])
+
         nav_back = Gio.SimpleAction.new("nav-back", None)
         nav_back.connect("activate", lambda *_: self._navigate_back())
         self.add_action(nav_back)
@@ -336,6 +364,7 @@ class MainWindow(Adw.ApplicationWindow):
                 f.write(text)
         except OSError:
             pass
+        self._tag_index.update_file(self._current_file)
 
     def _on_find(self, *_args):
         page = self._stack.get_visible_child_name()
@@ -391,6 +420,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._editing = False
             self._preview_btn.set_visible(False)
             self._open_in_btn.set_sensitive(True)
+            self._tag_index.update_file(self._current_file)
             self._start_watching()
 
     def _on_folder_selected(self, _sidebar, folder_path):
@@ -407,7 +437,9 @@ class MainWindow(Adw.ApplicationWindow):
             self._preview_btn.set_visible(False)
 
         from stenmark.sidebar import Sidebar
-        if folder_path == Sidebar.ALL_DOCUMENTS:
+        if folder_path.startswith("tag:"):
+            self._title_widget.set_subtitle(f"Tagged: {folder_path[4:]}")
+        elif folder_path == Sidebar.ALL_DOCUMENTS:
             self._title_widget.set_subtitle("All Documents")
         elif folder_path == Sidebar.NO_FOLDER:
             self._title_widget.set_subtitle("No Folder")
@@ -419,6 +451,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._open_in_btn.set_visible(False)
         self._export_pdf_action.set_enabled(False)
         self._toc_btn.set_visible(False)
+        self._tags_btn.set_visible(False)
         self._status_bar.set_visible(False)
         self._doc_panel.show_folder(folder_path)
         self._stack.set_visible_child_name("documents")
@@ -430,7 +463,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _update_back_btn(self):
         page = self._stack.get_visible_child_name()
-        if page in ("view", "edit", "search"):
+        if page in ("view", "edit", "search", "tags"):
             self._back_btn.set_visible(True)
         elif page == "documents" and self._doc_panel.is_drilled_in:
             self._back_btn.set_visible(True)
@@ -458,6 +491,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._open_in_btn.set_visible(False)
             self._export_pdf_action.set_enabled(False)
             self._toc_btn.set_visible(False)
+            self._tags_btn.set_visible(False)
             self._status_bar.set_visible(False)
             self._sidebar.set_outside_root(False)
             self._doc_panel.refresh()
@@ -468,6 +502,11 @@ class MainWindow(Adw.ApplicationWindow):
             self._doc_panel.refresh()
             self._stack.set_visible_child_name("documents")
             self._restore_folder_subtitle()
+        elif page == "tags":
+            self._tag_panel.clear()
+            self._doc_panel.refresh()
+            self._stack.set_visible_child_name("documents")
+            self._restore_folder_subtitle()
         elif page == "documents" and self._doc_panel.is_drilled_in:
             self._doc_panel.navigate_back()
         self._update_back_btn()
@@ -475,7 +514,9 @@ class MainWindow(Adw.ApplicationWindow):
     def _restore_folder_subtitle(self):
         from stenmark.sidebar import Sidebar
         folder = self._doc_panel._current_folder
-        if folder == Sidebar.ALL_DOCUMENTS:
+        if folder and folder.startswith("tag:"):
+            self._title_widget.set_subtitle(f"Tagged: {folder[4:]}")
+        elif folder == Sidebar.ALL_DOCUMENTS:
             self._title_widget.set_subtitle("All Documents")
         elif folder == Sidebar.NO_FOLDER:
             self._title_widget.set_subtitle("No Folder")
@@ -568,6 +609,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._open_in_btn.set_visible(True)
         self._export_pdf_action.set_enabled(True)
         self._toc_btn.set_visible(True)
+        self._tags_btn.set_visible(True)
         self._title_widget.set_subtitle(os.path.basename(path))
         self._viewer.load_file(path)
         self._stack.set_visible_child_name("view")
@@ -633,6 +675,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._viewer.load_file(self._current_file)
 
     def _on_file_trashed(self, _panel, path):
+        self._tag_index.remove_file(path)
         if self._current_file == path:
             self._stop_watching()
             self._current_file = None
@@ -643,12 +686,15 @@ class MainWindow(Adw.ApplicationWindow):
             self._open_in_btn.set_visible(False)
             self._export_pdf_action.set_enabled(False)
             self._toc_btn.set_visible(False)
+            self._tags_btn.set_visible(False)
             self._title_widget.set_subtitle("")
             self._status_bar.set_visible(False)
             self._stack.set_visible_child_name("documents")
         self._sidebar.refresh()
 
     def _on_file_renamed(self, _panel, old_path, new_path):
+        self._tag_index.remove_file(old_path)
+        self._tag_index.update_file(new_path)
         if self._current_file == old_path:
             self._current_file = new_path
             self._title_widget.set_subtitle(os.path.basename(new_path))
@@ -661,6 +707,7 @@ class MainWindow(Adw.ApplicationWindow):
             persisted = self._settings._data.get("root_directory")
             if persisted and "root_directory" not in self._settings._overrides:
                 self._root_ceiling = persisted
+            self._tag_index.set_root(self._settings.root_directory)
             self._update_root_label()
             self._sidebar.refresh()
             self._doc_panel.refresh()
@@ -678,6 +725,8 @@ class MainWindow(Adw.ApplicationWindow):
                 self._start_watching()
             else:
                 self._stop_watching()
+        elif key == "show_sidebar_tags":
+            self._sidebar.refresh()
 
     def _on_preview_toggled(self, btn):
         active = btn.get_active()
@@ -893,6 +942,108 @@ class MainWindow(Adw.ApplicationWindow):
             toast.set_title(message)
         self._toast_overlay.add_toast(toast)
 
+    # ---- Tag editor popover -----------------------------------------------
+
+    def _on_tags_clicked(self, btn):
+        if not self._current_file:
+            return
+
+        tags = list(read_tags(self._current_file))
+
+        popover = Gtk.Popover()
+        popover.set_parent(btn)
+        popover.set_has_arrow(True)
+
+        outer = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL,
+            spacing=8,
+            margin_start=8,
+            margin_end=8,
+            margin_top=8,
+            margin_bottom=8,
+        )
+        outer.set_size_request(260, -1)
+
+        # Current tags as removable chips
+        chips_box = Gtk.FlowBox(
+            selection_mode=Gtk.SelectionMode.NONE,
+            max_children_per_line=10,
+            homogeneous=False,
+        )
+        chips_box.set_row_spacing(4)
+        chips_box.set_column_spacing(4)
+
+        def rebuild_chips():
+            while True:
+                child = chips_box.get_first_child()
+                if child is None:
+                    break
+                chips_box.remove(child)
+            for tag in tags:
+                chip_box = Gtk.Box(
+                    orientation=Gtk.Orientation.HORIZONTAL,
+                    spacing=4,
+                    css_classes=["tag-chip"],
+                )
+                chip_box.append(Gtk.Label(label=tag, css_classes=["caption"]))
+                remove_btn = Gtk.Button(
+                    icon_name="stenmark-close-symbolic",
+                    css_classes=["flat", "circular"],
+                    valign=Gtk.Align.CENTER,
+                )
+                remove_btn.set_size_request(16, 16)
+                remove_btn.connect("clicked", on_remove_tag, tag)
+                chip_box.append(remove_btn)
+                chips_box.append(chip_box)
+
+        def on_remove_tag(_btn, tag):
+            if tag in tags:
+                tags.remove(tag)
+                update_tags(self._current_file, tags)
+                self._tag_index.update_file(self._current_file)
+                rebuild_chips()
+
+        rebuild_chips()
+        outer.append(chips_box)
+
+        # Entry for adding new tags with autocomplete
+        entry = Gtk.Entry(
+            placeholder_text="Add tag\u2026",
+            hexpand=True,
+        )
+
+        # Autocomplete via EntryCompletion
+        completion = Gtk.EntryCompletion()
+        store = Gtk.ListStore(str)
+        for t in self._tag_index.all_tags():
+            store.append([t])
+        completion.set_model(store)
+        completion.set_text_column(0)
+        completion.set_minimum_key_length(1)
+        completion.set_popup_completion(True)
+        entry.set_completion(completion)
+
+        def on_entry_activate(_entry):
+            new_tag = _entry.get_text().strip().lower()
+            if not new_tag or new_tag in tags:
+                _entry.set_text("")
+                return
+            tags.append(new_tag)
+            tags.sort()
+            update_tags(self._current_file, tags)
+            self._tag_index.update_file(self._current_file)
+            # Update autocomplete model
+            if not any(row[0] == new_tag for row in store):
+                store.append([new_tag])
+            rebuild_chips()
+            _entry.set_text("")
+
+        entry.connect("activate", on_entry_activate)
+        outer.append(entry)
+
+        popover.set_child(outer)
+        popover.popup()
+
     def _on_close_request(self, _win):
         if self._settings.get("remember_last_folder") and not getattr(self._settings, "cli_root", False):
             self._settings.set("last_root_folder", self._settings.root_directory)
@@ -907,6 +1058,38 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_new_file_from_welcome(self):
         """Trigger the sidebar's new-file dialog."""
         self._sidebar.activate_action("sidebar.new-file", None)
+
+    def _on_tag_filter(self, *_args):
+        """Switch to the tag filter pane."""
+        self._open_tag_panel()
+
+    def _open_tag_panel(self, preselect_tag=None):
+        """Show the tag filter pane, optionally pre-selecting a tag."""
+        if self._editing:
+            text = self._editor.get_text()
+            try:
+                with open(self._current_file, "w", encoding="utf-8") as f:
+                    f.write(text)
+            except OSError:
+                pass
+            self._editing = False
+            self._edit_btn.set_active(False)
+            self._preview_btn.set_visible(False)
+        self._title_widget.set_subtitle("Tags")
+        self._edit_btn.set_sensitive(False)
+        self._copy_rich_btn.set_visible(False)
+        self._open_in_btn.set_visible(False)
+        self._export_pdf_action.set_enabled(False)
+        self._toc_btn.set_visible(False)
+        self._tags_btn.set_visible(False)
+        self._status_bar.set_visible(False)
+        if preselect_tag:
+            self._tag_panel.select_tag(preselect_tag)
+        else:
+            self._tag_panel.show_tags()
+        self._stack.set_visible_child_name("tags")
+        self._back_btn.set_visible(True)
+        self._tag_panel.focus_entry()
 
     def _on_search(self, *_args):
         """Switch to the full-text search panel."""
@@ -930,6 +1113,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._open_in_btn.set_visible(False)
         self._export_pdf_action.set_enabled(False)
         self._toc_btn.set_visible(False)
+        self._tags_btn.set_visible(False)
         self._status_bar.set_visible(False)
         self._stack.set_visible_child_name("search")
         self._back_btn.set_visible(True)

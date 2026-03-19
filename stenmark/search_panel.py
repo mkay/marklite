@@ -19,6 +19,7 @@ class SearchPanel(Gtk.Box):
     __gsignals__ = {
         "file-selected": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
         "close-requested": (GObject.SignalFlags.RUN_FIRST, None, ()),
+        "tag-filter-requested": (GObject.SignalFlags.RUN_FIRST, None, ()),
     }
 
     def __init__(self, settings):
@@ -80,6 +81,13 @@ class SearchPanel(Gtk.Box):
             description="Search for text across all your markdown files.",
             vexpand=True,
         )
+        tag_link = Gtk.Button(
+            label="or filter by tags",
+            css_classes=["flat", "link"],
+            halign=Gtk.Align.CENTER,
+        )
+        tag_link.connect("clicked", lambda _b: self.emit("tag-filter-requested"))
+        self._status.set_child(tag_link)
         self.append(self._status)
 
         # Spinner overlay

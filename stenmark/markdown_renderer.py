@@ -91,6 +91,8 @@ class MarkdownRenderer:
         }
 
     def render(self, text):
+        from stenmark.frontmatter import parse_frontmatter
+        _meta, text = parse_frontmatter(text)
         md = markdown.Markdown(
             extensions=self._extensions,
             extension_configs=self._extension_configs,

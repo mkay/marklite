@@ -22,6 +22,7 @@ DEFAULTS = {
     "pinned_folders": [],
     "file_watching": True,
     "remember_last_folder": False,
+    "show_sidebar_tags": False,
     "last_root_folder": "",
     "window_width": 1000,
     "window_height": 700,

@@ -71,17 +71,23 @@ def _collect_subdir_files(dir_path, groups):
 
 
 def _read_title(path):
-    """Return the first # heading from a markdown file, or None."""
+    """Return the first # heading from a markdown file, or None.
+
+    Skips YAML frontmatter if present.
+    """
+    from stenmark.frontmatter import parse_frontmatter
     try:
         with open(path, encoding="utf-8", errors="replace") as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith("# "):
-                    return line[2:].strip() or None
-                if line:  # stop at first non-empty non-heading line
-                    return None
+            text = f.read(4096)
     except OSError:
-        pass
+        return None
+    _meta, body = parse_frontmatter(text)
+    for line in body.splitlines():
+        line = line.strip()
+        if line.startswith("# "):
+            return line[2:].strip() or None
+        if line:
+            return None
     return None
 
 
@@ -115,11 +121,13 @@ class DocumentPanel(Gtk.Box):
         "file-trashed": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
         "file-renamed": (GObject.SignalFlags.RUN_FIRST, None, (str, str)),
         "folder-navigated": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
+        "tag-clicked": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
     }
 
-    def __init__(self, settings):
+    def __init__(self, settings, tag_index=None):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self._settings = settings
+        self._tag_index = tag_index
         self._current_folder = None
         self._browsing_folder = None  # actual dir being displayed (may differ from _current_folder when drilled in)
         self._context_path = None
@@ -182,11 +190,14 @@ class DocumentPanel(Gtk.Box):
         self._setup_pane_context_menu()
 
     def show_folder(self, folder_path):
-        """Display documents for the given folder path, or all if ALL_DOCUMENTS."""
+        """Display documents for the given folder path, tag:name, or all if ALL_DOCUMENTS."""
         self._current_folder = folder_path
         self._clear()
 
-        if folder_path == Sidebar.ALL_DOCUMENTS:
+        if folder_path.startswith("tag:"):
+            self._browsing_folder = None
+            self._show_tagged_documents(folder_path[4:])
+        elif folder_path == Sidebar.ALL_DOCUMENTS:
             self._browsing_folder = None
             self._show_all_documents()
         elif folder_path == Sidebar.NO_FOLDER:
@@ -323,6 +334,46 @@ class DocumentPanel(Gtk.Box):
 
         return row
 
+    def _show_tagged_documents(self, tag):
+        """Show files that have the given tag, grouped by folder."""
+        if not self._tag_index:
+            return
+        files = self._tag_index.get_files(tag)
+        if not files:
+            self._scrolled.set_visible(False)
+            self._empty.set_visible(True)
+            return
+        self._scrolled.set_visible(True)
+        self._empty.set_visible(False)
+
+        root = self._settings.root_directory
+        groups = {}
+        for f in files:
+            d = os.path.dirname(f)
+            groups.setdefault(d, []).append(f)
+
+        for dir_path in sorted(groups.keys()):
+            if dir_path == root:
+                section_name = "No Folder"
+            else:
+                section_name = os.path.relpath(dir_path, root)
+
+            header = Gtk.Label(
+                label=section_name,
+                xalign=0,
+                css_classes=["heading"],
+                margin_top=20,
+                margin_bottom=6,
+                margin_start=4,
+            )
+            self._content_box.append(header)
+
+            listbox = self._make_listbox()
+            for path in sorted(groups[dir_path], key=lambda p: os.path.basename(p).lower()):
+                listbox.append(self._make_document_row(path))
+            self._content_box.append(listbox)
+        self._apply_filter()
+
     def _show_all_documents(self):
         root = self._settings.root_directory
         groups = _collect_md_files_recursive(root)
@@ -411,6 +462,25 @@ class DocumentPanel(Gtk.Box):
 
         info_box.append(title)
         info_box.append(subtitle)
+
+        tags = self._tag_index.get_tags(path) if self._tag_index else []
+        if tags:
+            tags_box = Gtk.Box(
+                orientation=Gtk.Orientation.HORIZONTAL,
+                spacing=6,
+                margin_top=2,
+            )
+            for tag in tags:
+                chip = Gtk.Label(
+                    label=tag,
+                    css_classes=["caption", "tag-chip-link"],
+                )
+                click = Gtk.GestureClick()
+                click.connect("pressed", self._on_tag_label_pressed, tag)
+                chip.add_controller(click)
+                tags_box.append(chip)
+            info_box.append(tags_box)
+
         box.append(info_box)
 
         if self._settings.is_pinned(path):
@@ -428,6 +498,7 @@ class DocumentPanel(Gtk.Box):
         row = Gtk.ListBoxRow(child=box)
         row._file_path = path
         row._display_name = display_name.lower()
+        row._tags = tags
 
         # Right-click gesture per row
         gesture = Gtk.GestureClick(button=Gdk.BUTTON_SECONDARY)
@@ -489,7 +560,8 @@ class DocumentPanel(Gtk.Box):
                         basename = os.path.basename(row._file_path).lower()
                     elif hasattr(row, "_folder_path"):
                         basename = os.path.basename(row._folder_path).lower()
-                    visible = query in name or query in basename
+                    tag_match = any(query in t for t in getattr(row, "_tags", []))
+                    visible = query in name or query in basename or tag_match
                     row.set_visible(visible)
                     if visible:
                         any_visible = True
@@ -500,6 +572,10 @@ class DocumentPanel(Gtk.Box):
                 if prev and isinstance(prev, Gtk.Label):
                     prev.set_visible(any_visible)
             child = child.get_next_sibling()
+
+    def _on_tag_label_pressed(self, gesture, _n_press, _x, _y, tag):
+        gesture.set_state(Gtk.EventSequenceState.CLAIMED)
+        self.emit("tag-clicked", tag)
 
     # ---- Row activation -------------------------------------------------
 
@@ -1092,7 +1168,9 @@ class DocumentPanel(Gtk.Box):
         self._navigate_to(parent)
 
     def refresh(self):
-        if self._current_folder in (Sidebar.ALL_DOCUMENTS, Sidebar.NO_FOLDER):
+        if self._current_folder and self._current_folder.startswith("tag:"):
+            self.show_folder(self._current_folder)
+        elif self._current_folder in (Sidebar.ALL_DOCUMENTS, Sidebar.NO_FOLDER):
             self.show_folder(self._current_folder)
         elif self._browsing_folder and self._browsing_folder != self._current_folder:
             # Drilled into a subfolder — refresh in place

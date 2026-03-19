@@ -36,5 +36,6 @@
     <file alias="stenmark-heading-3-symbolic.svg">icons/hicolor/scalable/actions/stenmark-heading-3-symbolic.svg</file>
     <file alias="stenmark-toc-symbolic.svg">icons/hicolor/scalable/actions/stenmark-toc-symbolic.svg</file>
     <file alias="stenmark-system-search-symbolic.svg">icons/hicolor/scalable/actions/stenmark-system-search-symbolic.svg</file>
+    <file alias="stenmark-tag-symbolic.svg">icons/hicolor/scalable/actions/stenmark-tag-symbolic.svg</file>
   </gresource>
 </gresources>

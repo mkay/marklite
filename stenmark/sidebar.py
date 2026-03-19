@@ -56,6 +56,7 @@ class Sidebar(Gtk.Box):
         "changed": (GObject.SignalFlags.RUN_FIRST, None, ()),
         "file-created": (GObject.SignalFlags.RUN_FIRST, None, (str,)),
         "search-requested": (GObject.SignalFlags.RUN_FIRST, None, ()),
+        "tag-filter-requested": (GObject.SignalFlags.RUN_FIRST, None, ()),
         "open-root-requested": (GObject.SignalFlags.RUN_FIRST, None, ()),
     }
 
@@ -63,9 +64,10 @@ class Sidebar(Gtk.Box):
     ALL_DOCUMENTS = "__ALL__"
     NO_FOLDER = "__ROOT__"
 
-    def __init__(self, settings):
+    def __init__(self, settings, tag_index=None):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self._settings = settings
+        self._tag_index = tag_index
         self._context_path = None
         self._selected_path = None
 
@@ -100,6 +102,13 @@ class Sidebar(Gtk.Box):
         )
         new_dir_btn.connect("clicked", lambda _b: self._new_directory(self._settings.root_directory))
 
+        tag_btn = Gtk.Button(
+            icon_name="stenmark-tag-symbolic",
+            tooltip_text="Filter by Tag",
+            hexpand=True,
+        )
+        tag_btn.connect("clicked", lambda _b: self.emit("tag-filter-requested"))
+
         search_btn = Gtk.Button(
             icon_name="stenmark-system-search-symbolic",
             tooltip_text="Search All Documents",
@@ -109,6 +118,7 @@ class Sidebar(Gtk.Box):
 
         action_bar.append(new_dir_btn)
         action_bar.append(new_file_btn)
+        action_bar.append(tag_btn)
         action_bar.append(search_btn)
         self._action_bar = action_bar
         self.append(action_bar)
@@ -182,6 +192,40 @@ class Sidebar(Gtk.Box):
             icon = "stenmark-pin-symbolic" if self._settings.is_folder_pinned(dir_path) else "stenmark-folder-symbolic"
             row = self._make_row(dir_name, icon, count, dir_path)
             self._listbox.append(row)
+
+        # Tags section
+        if self._tag_index and self._settings.get("show_sidebar_tags"):
+            all_tags = self._tag_index.all_tags()
+            if all_tags:
+                divider_box = Gtk.Box(
+                    orientation=Gtk.Orientation.VERTICAL,
+                    spacing=0,
+                )
+                divider_box.append(Gtk.Separator(margin_top=6, margin_bottom=4))
+                divider_box.append(Gtk.Label(
+                    label="Tags",
+                    xalign=0,
+                    css_classes=["dim-label", "caption"],
+                    margin_start=8,
+                    margin_bottom=2,
+                ))
+                divider_row = Gtk.ListBoxRow(child=divider_box)
+                divider_row.set_selectable(False)
+                divider_row.set_activatable(False)
+                divider_row.set_can_focus(False)
+                divider_row.set_can_target(False)
+                divider_row.add_css_class("sidebar-divider")
+                self._listbox.append(divider_row)
+
+                for tag in all_tags:
+                    count = self._tag_index.tag_count(tag)
+                    row = self._make_row(
+                        tag,
+                        "stenmark-tag-symbolic",
+                        count,
+                        f"tag:{tag}",
+                    )
+                    self._listbox.append(row)
 
         # Reconnect and select "All Documents" by default
         self._listbox.connect("row-activated", self._on_row_selected)

@@ -11,6 +11,7 @@ depends=(
   'python-gobject'
   'python-markdown'
   'python-pygments'
+  'python-yaml'
   'gtk4'
   'libadwaita'
   'webkitgtk-6.0'
