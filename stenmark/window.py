@@ -1001,6 +1001,7 @@ class MainWindow(Adw.ApplicationWindow):
                 tags.remove(tag)
                 update_tags(self._current_file, tags)
                 self._tag_index.update_file(self._current_file)
+                self._sidebar.refresh_tags()
                 rebuild_chips()
 
         rebuild_chips()
@@ -1032,6 +1033,7 @@ class MainWindow(Adw.ApplicationWindow):
             tags.sort()
             update_tags(self._current_file, tags)
             self._tag_index.update_file(self._current_file)
+            self._sidebar.refresh_tags()
             # Update autocomplete model
             if not any(row[0] == new_tag for row in store):
                 store.append([new_tag])

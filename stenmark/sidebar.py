@@ -643,6 +643,55 @@ class Sidebar(Gtk.Box):
         self._populate()
         self.emit("changed")
 
+    def refresh_tags(self):
+        """Rebuild only the tag rows in the sidebar (no selection change)."""
+        if not self._tag_index or not self._settings.get("show_sidebar_tags"):
+            return
+        # Remove existing tag rows (divider + tag rows at the end)
+        while True:
+            row = self._listbox.get_last_child()
+            if row is None:
+                break
+            if hasattr(row, '_folder_path') and row._folder_path.startswith("tag:"):
+                self._listbox.remove(row)
+            elif row.has_css_class("sidebar-divider"):
+                self._listbox.remove(row)
+                break
+            else:
+                break
+        # Re-add tag section
+        all_tags = self._tag_index.all_tags()
+        if all_tags:
+            divider_box = Gtk.Box(
+                orientation=Gtk.Orientation.VERTICAL,
+                spacing=0,
+            )
+            divider_box.append(Gtk.Separator(margin_top=6, margin_bottom=4))
+            divider_box.append(Gtk.Label(
+                label="Tags",
+                xalign=0,
+                css_classes=["dim-label", "caption"],
+                margin_start=8,
+                margin_bottom=2,
+            ))
+            divider_row = Gtk.ListBoxRow(child=divider_box)
+            divider_row.set_selectable(False)
+            divider_row.set_activatable(False)
+            divider_row.set_can_focus(False)
+            divider_row.set_can_target(False)
+            divider_row.add_css_class("sidebar-divider")
+            self._listbox.append(divider_row)
+
+            for tag in all_tags:
+                count = self._tag_index.tag_count(tag)
+                row = self._make_row(
+                    tag,
+                    "stenmark-tag-symbolic",
+                    count,
+                    f"tag:{tag}",
+                )
+                self._listbox.append(row)
+
     def set_outside_root(self, outside):
         if outside:
             self._scrolled.set_visible(False)
